@@ -92,6 +92,28 @@ Full setup: [Upload Sketch for BiBoard](https://guide.petoi.com/arduino-ide/uplo
 
 ---
 
+## Python API
+
+Control a robot from Python over USB, Bluetooth, BLE, or Wi-Fi with the `petoi` package in [`python/`](python/). No robot yet? `petoi.connect("mock")` runs everything offline.
+
+```python
+import time
+
+import petoi
+
+with petoi.connect() as robot:  # or "bluetooth", "ble", "192.168.4.1"
+    print(robot.model, robot.firmware)
+    robot.sit()
+    robot.walk()
+    time.sleep(3)  # Ctrl-C here stops the robot safely
+    robot.stop()
+    robot.rest()
+```
+
+Install and usage: [python/README.md](python/README.md).
+
+---
+
 ## What People Have Built
 
 - [AI and computer vision applications](https://www.petoi.com/blogs/blog/tagged/showcase+ai?utm_source=github&utm_medium=code&utm_campaign=github-opencat)
