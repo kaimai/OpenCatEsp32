@@ -26,7 +26,7 @@
 | Joint groups: 0 head pan, 1 head tilt, 2 tail, 8–11 shoulder pitch, 12–15 knee | `src/OpenCat.h:235-237` |
 | BLE is Nordic UART: service `6E400001-…`, robot RX `6E400002-…`, robot TX `6E400003-…`; device name contains `_BLE` | `src/bleCommon.h:6-8`, `src/bleUart.h:99` |
 | Bluetooth Classic SPP device name contains `_SSP` | `src/bluetoothManager.h:73` |
-| Wi-Fi: WebSocket on port 81, JSON `{"type":"command","taskId":…,"commands":[…]}`; replies `status: running/completed/error` with `results`; `b64:` prefix for binary; heartbeat timeout 40 s; one task at a time; max 2 clients | `src/webServer.h:51-59, 248-357, 380-400, 445-486` |
+| Wi-Fi: WebSocket on port 81, JSON `{"type":"command","taskId":…,"commands":[…]}`; replies `status: running/completed/error` with `results`; `b64:` prefix for binary; heartbeat timeout 40 s; one task at a time; max 2 clients; a rejected overlapping command produces an `error` carrying the running task's id, not the new one's | `src/webServer.h:51-59, 248-357, 346-347, 380-400, 445-512` |
 | `X`, `R`, `W` tokens are binary but still have `\r`/`\n` stripped and leading spaces trimmed | `src/moduleManager.h:427-436` |
 | Skill names (`sit up balance str hi pu ck pee snf scrh zz fiv hsk`, gaits `wk tr cr bk` + `F`/`L`; `R` mirrored from `L`) | `src/InstinctBittleESP.h:2486`, `src/skill.h:501` |
 
@@ -40,6 +40,7 @@
 6. Skill meanings (e.g. `fiv` = high five, `hsk` = handshake) match their names.
 7. Head-only joint moves after a posture finish after the echo; scenario uses a ±3° tolerance and polling.
 8. No one-shot skill takes longer than STALE_SECONDS (15 s) to echo; a later echo could still be mistaken for a newer command.
+9. With two same-token commands unconfirmed, a third may report one spurious timeout (bounded; the next recovers).
 
 The hardware checklist in the Test Plan verifies each of these and records the result.
 
@@ -1883,3 +1884,11 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - G1: A late echo matching any unconfirmed entry (not just the first) drops the entries up to it, and a waited command that times out after swallowing its own token's stale echo clears the list instead of re-adding itself; otherwise one lost echo made every later command of that token fail while retries came less than 15 s apart.
 - G2: `Robot.send` rejects a bare `\r` in the command body, since the firmware truncates there (`src/moduleManager.h:431-435`).
 - G3: WebSocketTransport passes `legacy=True` to `connect()` only when its signature has that parameter (websockets 17.1+), to avoid the direct-connect DeprecationWarning; 12.0, 15.0.1, 16.0, 17.0 and 17.1 all pass the websocket tests.
+- H1/H2: WebSocketTransport reads every message on one background thread into a queue, so unrelated traffic can't extend a command's deadline and idle heartbeat replies can't fill websockets' 16-frame queue (which closed idle connections with 1011). `max_queue=None` is passed only where the argument exists (websockets 15+).
+- H3: A task id we sent that never completed is tracked; an `error` carrying one of those ids raises "robot is still busy", since the firmware reports rejections with the running task's id (`src/webServer.h:346-347`, `:487-512`).
+- H4: Wi-Fi and BLE I/O failures become `ConnectionFailed`, and `connect()` closes the transport if anything after opening raises.
+- H5: A Wi-Fi host that already includes a port is not given a second one, and `name.local:port` is classified as Wi-Fi.
+- H6: The CLI exits 1 when the robot does not confirm and 2 for a bad command.
+- H7: BLE cleans up on any failure (including Ctrl-C), closes its loop, resets the line buffer on discard, and sizes writes from `max_write_without_response_size` (fallback 20).
+- H8: Clearer errors for Bluetooth port selection on Windows/Linux and for a refused Wi-Fi hello (max 2 clients; `src/webServer.h:150`).
+- H9: README notes the explicit Bluetooth port rule and CLI exit codes; Assumption 9 added.

@@ -30,17 +30,38 @@ class BleTransport(StreamTransport):
         self._thread.start()
         self._lines: "queue.Queue[str]" = queue.Queue()
         self._buffer = LineBuffer()
+        self._client = None
+        self._chunk = CHUNK
+        self._connected = False
         try:
             address = address or self._run(self._find(scan_timeout))
             self._client = bleak.BleakClient(address)
             self._run(self._client.connect())
+            self._connected = True
             self._run(self._client.start_notify(ROBOT_TX, self._on_notify))
-        except ConnectionFailed:
-            self._shutdown_loop()
+            self._chunk = self._negotiated_chunk()
+        except BaseException as e:  # incl. KeyboardInterrupt: clean up, then re-raise
+            self._cleanup()
+            if isinstance(e, Exception) and not isinstance(e, ConnectionFailed):
+                where = f" {address}" if address else ""
+                raise ConnectionFailed(f"could not connect to BLE device{where}: {e}") from e
             raise
-        except Exception as e:
-            self._shutdown_loop()
-            raise ConnectionFailed(f"could not connect to BLE device {address}: {e}") from e
+
+    def _negotiated_chunk(self) -> int:
+        try:
+            char = self._client.services.get_characteristic(ROBOT_RX)
+            return max(int(char.max_write_without_response_size), 1)  # bleak >= 0.22
+        except Exception:
+            return CHUNK
+
+    def _cleanup(self) -> None:
+        if self._connected:
+            try:
+                self._run(self._client.disconnect())
+            except Exception:
+                pass
+            self._connected = False
+        self._shutdown_loop()
 
     def _run(self, coro):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
@@ -60,8 +81,11 @@ class BleTransport(StreamTransport):
             self._lines.put(line)
 
     def write(self, data: bytes) -> None:
-        for i in range(0, len(data), CHUNK):
-            self._run(self._client.write_gatt_char(ROBOT_RX, data[i : i + CHUNK], response=False))
+        try:
+            for i in range(0, len(data), self._chunk):
+                self._run(self._client.write_gatt_char(ROBOT_RX, data[i : i + self._chunk], response=False))
+        except Exception as e:
+            raise ConnectionFailed(f"lost BLE connection: {e}") from e
 
     def readline(self, timeout: float) -> Optional[str]:
         try:
@@ -70,15 +94,15 @@ class BleTransport(StreamTransport):
             return None
 
     def discard_input(self) -> None:
+        self._buffer = LineBuffer()
         while not self._lines.empty():
             self._lines.get_nowait()
 
     def close(self) -> None:
-        try:
-            self._run(self._client.disconnect())
-        finally:
-            self._shutdown_loop()
+        self._cleanup()
 
     def _shutdown_loop(self) -> None:
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=2)
+        if not self._thread.is_alive():
+            self._loop.close()

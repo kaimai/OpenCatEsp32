@@ -70,6 +70,8 @@ with petoi.connect() as robot:  # finds a USB robot by itself
 
 Run `petoi ports` (see CLI below) to see what serial ports your computer has.
 
+`connect("bluetooth")` finds the robot by `_SSP` in the port name, which macOS does. On Windows and Linux the Bluetooth port has no such name, so pass the Bluetooth COM port or `/dev/rfcomm*` port explicitly.
+
 ### USB takes a while to connect
 
 Opening a USB serial port usually resets the robot's board, so it reboots. `connect()` waits for the robot to print `Ready!`, for up to 20 seconds, so your first command is not lost during boot. If the robot prints nothing for 1.5 seconds right after opening, it is assumed to be running already and the wait ends early. Bluetooth Classic does not reset the board, so it does not wait. If `Ready!` never appears, you get a warning (the robot may be waiting at a calibration prompt) and you can open a serial monitor to check.
@@ -148,6 +150,8 @@ petoi send ksit                  # send a command to the USB robot
 petoi send ksit --to ble         # ...or to a BLE robot ("bluetooth", an IP address, a port name, "mock")
 petoi send "?" --to mock
 ```
+
+Exit codes: 0 means the robot confirmed the command, 1 means a failure or no reply from the robot, 2 means a bad command (for example an uppercase binary command).
 
 ## Troubleshooting
 
