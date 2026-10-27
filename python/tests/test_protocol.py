@@ -51,3 +51,36 @@ def test_binary_rejects_out_of_int8_range():
 def test_token_must_be_one_character():
     with pytest.raises(ValueError):
         encode("ks", "it")
+
+
+from petoi.protocol import LineBuffer, Reply, collect_reply, parse_ints  # noqa: E402
+
+
+def test_parse_ints_from_joint_line():
+    # tools.h:89 list2String -> "0,\t-3,\t45,\t"
+    assert parse_ints("0,\t-3,\t45,\t") == [0, -3, 45]
+
+
+def test_collect_reply_stops_at_echo_and_drops_markers():
+    # reaction.h:681 prints '=', :685-686 prints two lines, :1557 echoes token
+    lines = iter(["=", "0\t1\t2\t", "0,\t-3,\t45,\t", "j", "late"])
+    reply = collect_reply("j", lambda: next(lines))
+    assert reply == Reply("j", ["0\t1\t2", "0,\t-3,\t45,"], completed=True)
+
+
+def test_collect_reply_incomplete_when_source_runs_dry():
+    lines = iter(["hello", None])
+    reply = collect_reply("k", lambda: next(lines))
+    assert reply.completed is False
+    assert reply.lines == ["hello"]
+
+
+def test_reply_text_joins_lines():
+    assert Reply("?", ["Bittle X", "B10_260820"], True).text == "Bittle X\nB10_260820"
+
+
+def test_line_buffer_reassembles_chunks():
+    buf = LineBuffer()
+    assert buf.feed(b"Bit") == []
+    assert buf.feed(b"tle X\r\nB10") == ["Bittle X"]
+    assert buf.feed(b"\r\n?\r\n") == ["B10", "?"]
