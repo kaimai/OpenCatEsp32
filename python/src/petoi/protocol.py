@@ -10,7 +10,7 @@ import operator
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Union
+from typing import Any, List, Union
 
 BINARY_TERMINATOR = b"~"
 _TILDE = 126
@@ -34,7 +34,7 @@ def encode(token: str, *args: Union[int, str]) -> bytes:
     if token.isupper():
         values = []
         for a in args:
-            raw = a.value if isinstance(a, Enum) else a
+            raw: Any = a.value if isinstance(a, Enum) else a  # a str raises TypeError below
             try:
                 values.append(operator.index(raw))
             except TypeError:

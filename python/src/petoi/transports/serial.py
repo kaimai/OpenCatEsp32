@@ -22,7 +22,7 @@ READ_SLICE = 0.05  # port read timeout; readline() loops over slices
 class SerialTransport(StreamTransport):
     """USB cable, or a paired Bluetooth Classic (_SSP) port."""
 
-    def __init__(self, port: Union[str, serial.SerialBase], boot_timeout: float = 20.0):
+    def __init__(self, port: Union[str, serial.Serial], boot_timeout: float = 20.0):
         if isinstance(port, str):
             try:
                 port = serial.Serial(port, BAUD, timeout=READ_SLICE)

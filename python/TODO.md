@@ -56,7 +56,7 @@ Items 1–4 below: plan part E.
 
 - [ ] **Bug: Wi-Fi `wait=False` waits 5 s.** `WebSocketTransport.command` uses `timeout or self._default_timeout`, so 0 means the default (`src/petoi/transports/websocket.py:106`). A long skill sent with `wait=False` returns incomplete after 5 s and the next command gets "busy". Needs a fix and a test.
 - [x] Set a minimum hatchling version and fill in the project metadata (URLs, classifiers, keywords).
-- [ ] Add a mypy step to CI.
+- [x] Add a mypy step to CI.
 - [x] Add a CI matrix entry pinned to the oldest supported websockets (13) to catch API drift.
 - [x] `tests/test_constants.py` reads `../src/Instinct*.h`, so it only runs from a repo checkout, not from an
   sdist. Fine for CI; skip it cleanly if the headers are missing.

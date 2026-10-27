@@ -59,6 +59,7 @@ def _open(kind: str, value: Optional[str], timeout: float):
         return MockTransport()
     if kind == "wifi":
         from petoi.transports.websocket import WebSocketTransport
+        assert value is not None  # classify() always gives "wifi" a host
         return WebSocketTransport(value, timeout=timeout)
     if kind == "ble":
         from petoi.transports.ble import BleTransport

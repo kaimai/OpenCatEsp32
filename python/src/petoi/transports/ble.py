@@ -4,7 +4,7 @@ import asyncio
 import concurrent.futures
 import queue
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from petoi.errors import ConnectionFailed
 from petoi.protocol import LineBuffer
@@ -32,7 +32,7 @@ class BleTransport(StreamTransport):
         self._thread.start()
         self._lines: "queue.Queue[str]" = queue.Queue()
         self._buffer = LineBuffer()
-        self._client = None
+        self._client: Any = None  # bleak.BleakClient; bleak is an optional import
         self._chunk = CHUNK
         self._connected = False
         self._closed = False

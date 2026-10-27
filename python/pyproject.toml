@@ -56,3 +56,10 @@ markers = ["hardware: needs a real robot (set PETOI_PORT, PETOI_BT, PETOI_BLE, o
 [tool.coverage.run]
 # bleak I/O is only exercised by the hardware tests (see Test Plan L5)
 omit = ["*/petoi/transports/ble.py"]
+
+[tool.mypy]
+files = ["src/petoi"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_equality = true

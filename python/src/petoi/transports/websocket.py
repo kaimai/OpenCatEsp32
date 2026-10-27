@@ -8,7 +8,7 @@ import queue
 import re
 import threading
 import time
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from petoi.errors import ConnectionFailed, RobotError
 from petoi.protocol import Reply, collect_reply
@@ -48,7 +48,7 @@ class WebSocketTransport(Transport):
         else:
             url = f"ws://{host}:{port}"
         params = inspect.signature(connect).parameters
-        kwargs = {}
+        kwargs: Dict[str, Any] = {}
         if "legacy" in params:
             kwargs["legacy"] = True  # websockets >= 17.1 warns on a direct connect() otherwise
         if "max_queue" in params:
@@ -73,7 +73,7 @@ class WebSocketTransport(Transport):
         self._ids = itertools.count(1)
         self._default_timeout = timeout
         self._outstanding: List[str] = []  # task ids we sent that never completed
-        self._messages: "queue.Queue[object]" = queue.Queue()
+        self._messages: "queue.Queue[Any]" = queue.Queue()
         self._stop = threading.Event()
         threading.Thread(target=self._read, daemon=True).start()
         if heartbeat:

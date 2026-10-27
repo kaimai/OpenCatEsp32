@@ -45,3 +45,15 @@ jobs:
       - run: pip install -e ".[dev]" "websockets==13.*"
       - run: python -c "import websockets, sys; print(websockets.__version__); sys.exit(not websockets.__version__.startswith('13.'))"
       - run: pytest -v -W error::DeprecationWarning
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev]" "mypy==2.4.0" "types-pyserial==3.5.0.20260712"
+      - run: mypy
