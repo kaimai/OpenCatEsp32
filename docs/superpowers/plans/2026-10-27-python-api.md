@@ -1880,3 +1880,6 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - F8: `__exit__` stops the robot best-effort with a 1 s wait and catches any `Exception`, so it never masks the user's exception.
 - F9: MockTransport ignores out-of-range joint indices like the firmware (`src/reaction.h:882`, `:1077`) and documents what it does not model.
 - F10: The shared scenario polls joint angles with a ±3° tolerance because head-only moves finish after the echo (`src/reaction.h:1043-1047`, `src/skill.h:414`).
+- G1: A late echo matching any unconfirmed entry (not just the first) drops the entries up to it, and a waited command that times out after swallowing its own token's stale echo clears the list instead of re-adding itself; otherwise one lost echo made every later command of that token fail while retries came less than 15 s apart.
+- G2: `Robot.send` rejects a bare `\r` in the command body, since the firmware truncates there (`src/moduleManager.h:431-435`).
+- G3: WebSocketTransport passes `legacy=True` to `connect()` only when its signature has that parameter (websockets 17.1+), to avoid the direct-connect DeprecationWarning; 12.0, 15.0.1, 16.0, 17.0 and 17.1 all pass the websocket tests.
