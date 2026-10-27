@@ -1911,3 +1911,22 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - Motivation: classroom scripts turn balancing off before tricks so the robot does not fight them (PetoiRobot `deacGyro()` sends `gb` on BiBoard; workshop `level-2.py`/`level-3.py` mark it "Do not remove this").
 - `GYRO_PIN` is defined for every build except `VT` (`src/OpenCat.h:94-96`); without it the command is accepted but does nothing (by reading, untested).
 - Test: `gyro(True)` writes `b"gB\n"`, `gyro(False)` writes `b"gb\n"`; a `gb` reply of `["g", "g"]` confirms and the following command still parses its own reply. Out of scope: `g?` state parsing, `gc` calibration (shuts servos, interactive).
+
+### Amendment: API doc review notes and workshop findings (approved 2026-10-27, "all")
+
+Decisions per review note (numbers match the API doc):
+
+1. Docstrings: one line on every public method and `list_ports_info`, saying what the call does.
+2. `stand()` and `stop()` both stay (same `kup`); no change.
+3. `wait: bool = True` on `sit`, `stand`, `stop`, `rest`, `walk`, `trot`, `crawl`, `back`, `joint`, `move_joints`, `melody`. `wait=False` neither waits nor raises, as in `skill()`.
+4. `joint()`/`move_joints()` round float angles to the nearest degree (Python `round`) before sending; the firmware's `atoi` would truncate (`src/reaction.h:877`).
+5. `Skill` gains members whose meaning is sourced (workshop `level-3.py` table, `ChangeLog.md`, `src/infrared.h`). Availability is checked by a test that parses `skillNameWithType` in `src/InstinctBittleESP.h`, `src/InstinctBittleESP_arm.h` and `src/InstinctNybbleESP.h`, against a documented exceptions table in `constants.py` (`ONLY_ON`). Unclear names (`zero`, `ts`, `calib`, `lnd`, `launch`, `pick*`, `put*`, `toss*`, `flip*`, `knock`, `lucky`, `dropRec`, `lu`, `lkPaws`, `headToss`) stay reachable through `skill("...")`. `RISKY` lists members the firmware bars from random mode (`src/randomMind.h:51`); the hardware test skips them unless `PETOI_RISKY=1`.
+6. `back(direction=None)`: `None` sends `kbk`, `"left"` `kbkL`, `"right"` `kbkR`. `bkR` resolves like `wkR` (prefix match, `src/skill.h:55-58`, then mirrored by `offsetLR`, `:483`).
+7. `connect(timeout)` is also the BLE scan time; the scan's run limit becomes `timeout + RUN_TIMEOUT`.
+8. PyPI: `petoi` and `petoi-robot` both 404 on 2026-10-27. Uploading is the owner's call and needs their account; Claude builds and gives the command, does not upload.
+9. Hardware checklist unchanged as the merge gate; new checks added for `melody`, `back("left"/"right")`, and model-aware skill coverage.
+
+Workshop findings (segunakinyemi.com "Three Levels of Programming"):
+
+- `melody(notes, wait=True)` sends `b n1 d1 n2 d2 ...\n` (`src/OpenCat.h:294-296`). Duration `d` means 1000/d ms (`src/reaction.h:1003-1004`); the reply timeout is `robot.timeout` plus the melody's length. An empty list is rejected (bare `b` toggles all sound, `:967`), as is a duration below 1 (skipped by the firmware) or a pair that is not two ints.
+- `beep()` docstring states the duration rule (8 = 125 ms) and that notes are semitones above C6, 0 = rest (`src/sound.h:38`, `:75`).
