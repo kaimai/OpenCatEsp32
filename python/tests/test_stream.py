@@ -92,3 +92,15 @@ def test_expect_zero_timeout_marks_the_echo_owed():
     s.replies[b"ksit\n"] = ["K", "k"]
     reply = s.command("k", b"ksit\n", timeout=0.05)
     assert reply.completed and reply.lines == []
+
+
+def test_owed_entry_expires_from_when_the_wait_ends(monkeypatch):
+    import time
+
+    import petoi.transports.base as base
+
+    monkeypatch.setattr(base, "STALE_SECONDS", 0.1)
+    s = FakeStream(auto_echo=False)
+    s.readline = lambda timeout: time.sleep(timeout)  # the robot stays silent for the whole wait
+    s.expect("k", timeout=0.15)  # longer than the stale window
+    assert s._unconfirmed and s._unconfirmed[-1][1] > time.monotonic()

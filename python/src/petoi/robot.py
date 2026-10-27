@@ -100,8 +100,10 @@ class Robot:
             if stream is not None and (reply.completed or not wait):
                 end = stream.expect("K", timeout if wait else 0)
                 reply = Reply("K", reply.lines + end.lines, end.completed)
+            elif stream is not None:
+                stream.expect("K", 0)  # the start echo is late, so the end echo is still owed too
         if wait and not reply.completed:
-            raise RobotTimeout("robot did not confirm the uploaded skill in time; check power and the connection, or pass a longer timeout")
+            raise RobotTimeout("robot did not confirm the uploaded skill in time; check power and the connection")
         return reply
 
     def sit(self, wait: bool = True) -> Reply:
@@ -215,10 +217,11 @@ class Robot:
         """Over USB, put the robot on a 2.4 GHz Wi-Fi network and return its IP address for petoi.connect()."""
         _check_wifi(ssid, password)
         transport = self.transport
-        if not isinstance(transport, StreamTransport):
+        from petoi.transports.ble import BleTransport  # the reboot drops BLE, and failures print to USB only (src/reaction.h:477)
+
+        if not isinstance(transport, StreamTransport) or isinstance(transport, BleTransport):
             raise RobotError("setup_wifi() works over the USB cable; connect with petoi.connect() first")
         payload = f"w%{ssid}%{password}\n".encode()  # src/reaction.h:442-446
-        deadline = time.monotonic() + timeout
         ips: List[str] = []
         already: Optional[str] = None
         failed = False
@@ -226,6 +229,7 @@ class Robot:
             transport.discard_input()
             transport._unconfirmed.clear()  # the robot reboots; nothing sent earlier will echo now
             transport.write(payload)
+            deadline = time.monotonic() + timeout  # counted from sending, not from waiting for the lock
             # Never keep or show robot lines: they include the password's last 4 characters (src/reaction.h:449-458).
             for line in _lines(transport, deadline):
                 joined, found = _WIFI_JOINED.search(line), _WIFI_ALREADY.search(line)
@@ -241,6 +245,9 @@ class Robot:
                 elif _WIFI_FAILED in line:
                     failed = True
                 elif line == _UNDEFINED:
+                    for rest in _lines(transport, deadline):  # next line is the whole command, password included (:1536)
+                        if rest == "w":
+                            break
                     raise RobotError("this robot's firmware has no Wi-Fi support; update it with the Petoi Desktop App")
                 elif line == "w":  # echoed only when it did not reboot (src/reaction.h:1557)
                     if already:

@@ -60,9 +60,8 @@ class StreamTransport(Transport):
     def expect(self, token: str, timeout: float) -> Reply:
         """Wait for one more echo of token without sending; timeout=0 only marks it as owed."""
         pending = self._unconfirmed
-        entry = (token, time.monotonic() + STALE_SECONDS)
         if not timeout:
-            pending.append(entry)
+            pending.append((token, time.monotonic() + STALE_SECONDS))
             return Reply(token)
         deadline = time.monotonic() + timeout
         consumed_own = False
@@ -88,5 +87,5 @@ class StreamTransport(Transport):
             if consumed_own:
                 pending.clear()  # the echo we swallowed as stale was most likely our own
             else:
-                pending.append(entry)
+                pending.append((token, time.monotonic() + STALE_SECONDS))  # the window starts when we stop waiting
         return reply

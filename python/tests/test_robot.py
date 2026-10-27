@@ -492,6 +492,7 @@ def test_setup_wifi_on_firmware_without_wifi_hides_the_echoed_command():
     with pytest.raises(RobotError, match="no Wi-Fi support") as e:
         r.setup_wifi("Home", PW)
     assert_secret_kept(e.value)
+    assert r.transport.pending == []  # the echoed command (with the password) was read and dropped
 
 
 def test_setup_wifi_bare_echo_means_not_accepted():
@@ -548,3 +549,27 @@ class NotAStream(Transport):
 def test_setup_wifi_needs_a_serial_link():
     with pytest.raises(RobotError, match="USB"):
         Robot(NotAStream()).setup_wifi("Home", PW)
+
+
+def test_behavior_start_timeout_owes_both_echoes():
+    data = behavior(STILL, HEAD)
+    r = robot({encode("K", *data): []})
+    with pytest.raises(RobotTimeout):
+        r.run_skill_data(data)  # the robot still sends a start and an end K later
+    r.transport.replies[encode("K", *data)] = ["K", "K", "K"]  # two late echoes, then only this upload's start
+    with pytest.raises(RobotTimeout):
+        r.run_skill_data(data)  # must not take the late echoes for its own
+
+
+def test_setup_wifi_timeout_starts_after_the_lock_is_free():
+    r = wifi_robot([JOINED, JOINED, "Ready!"])
+    r._lock.acquire()
+    threading.Timer(0.4, r._lock.release).start()  # another command holds the link for a while
+    assert r.setup_wifi("Home", PW, timeout=0.3) == "192.168.1.23"
+
+
+def test_setup_wifi_refuses_ble():
+    from petoi.transports.ble import BleTransport
+
+    with pytest.raises(RobotError, match="USB"):
+        Robot(object.__new__(BleTransport)).setup_wifi("Home", PW)  # the reboot drops BLE; failures print to USB only
