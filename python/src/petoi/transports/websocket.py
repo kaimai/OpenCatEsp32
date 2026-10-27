@@ -55,12 +55,19 @@ class WebSocketTransport(Transport):
             kwargs["max_queue"] = None  # the sync client has an unbounded queue before websockets 15 (12.0 has no such argument)
         try:
             self._ws = connect(url, open_timeout=timeout, **kwargs)
-            hello = json.loads(self._ws.recv(timeout))
-        except ConnectionClosed as e:
-            raise ConnectionFailed(f"could not connect to {url}: {e} {_CLIENT_LIMIT_HINT}") from e
         except Exception as e:
             raise ConnectionFailed(f"could not connect to {url}: {e}") from e
+        try:
+            hello = json.loads(self._ws.recv(timeout))
+        except Exception as e:
+            self._ws.close()
+            hint = f" {_CLIENT_LIMIT_HINT}" if isinstance(e, ConnectionClosed) else ""
+            raise ConnectionFailed(f"could not connect to {url}: {e or type(e).__name__}{hint}") from e
+        if not isinstance(hello, dict):
+            self._ws.close()
+            raise ConnectionFailed(f"unexpected greeting from {url}: {hello!r}")
         if hello.get("type") == "error":
+            self._ws.close()
             raise ConnectionFailed(hello.get("error", "robot refused the connection"))
         self._closed_errors = (ConnectionClosed, OSError)
         self._ids = itertools.count(1)

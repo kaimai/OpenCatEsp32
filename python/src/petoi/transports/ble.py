@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import queue
 import threading
 from typing import Optional
@@ -14,6 +15,7 @@ ROBOT_RX = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  # we write here
 ROBOT_TX = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  # robot notifies here
 NAME_MARK = "_BLE"  # src/bleUart.h:99
 CHUNK = 20  # default BLE payload size
+RUN_TIMEOUT = 15.0  # seconds any single BLE operation may take
 
 
 class BleTransport(StreamTransport):
@@ -33,6 +35,7 @@ class BleTransport(StreamTransport):
         self._client = None
         self._chunk = CHUNK
         self._connected = False
+        self._closed = False
         try:
             address = address or self._run(self._find(scan_timeout))
             self._client = bleak.BleakClient(address)
@@ -64,7 +67,12 @@ class BleTransport(StreamTransport):
         self._shutdown_loop()
 
     def _run(self, coro):
-        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        try:
+            return future.result(timeout=RUN_TIMEOUT)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            raise ConnectionFailed(f"the BLE robot did not respond within {RUN_TIMEOUT:g}s") from None
 
     async def _find(self, timeout: float) -> str:
         devices = await self._bleak.BleakScanner.discover(timeout=timeout)
@@ -99,9 +107,14 @@ class BleTransport(StreamTransport):
             self._lines.get_nowait()
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         self._cleanup()
 
     def _shutdown_loop(self) -> None:
+        if self._loop.is_closed():
+            return
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=2)
         if not self._thread.is_alive():

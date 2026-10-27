@@ -19,7 +19,9 @@ class Joint(IntEnum):
 
 
 class Skill(str, Enum):
-    """Built-in one-shot skills (names from src/InstinctBittleESP.h:2486)."""
+    """Built-in one-shot skills (names from src/InstinctBittleESP.h:2486).
+
+    All are also in src/InstinctNybbleESP.h except SLEEP ("zz"), which is Bittle-only."""
 
     SIT = "sit"
     STAND = "up"

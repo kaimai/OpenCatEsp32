@@ -97,7 +97,10 @@ def test_unrelated_traffic_cannot_keep_command_waiting_forever():
         try:
             while time.monotonic() < end:
                 ws.send(json.dumps({"type": "event_us", "distance": 40}))
-                time.sleep(0.05)
+                try:
+                    ws.recv(timeout=0.05)  # drain input so the client's close handshake isn't stuck
+                except TimeoutError:
+                    pass
         except Exception:
             pass
 
@@ -129,4 +132,26 @@ def test_hello_failure_mentions_client_limit():
     srv, p = run_server(lambda ws: None)  # closes without a hello
     with pytest.raises(ConnectionFailed, match="at most 2 Wi-Fi clients"):
         WebSocketTransport("127.0.0.1", port=p, heartbeat=False)
+    srv.shutdown()
+
+
+def test_non_dict_hello_is_rejected_and_connection_closed():
+    seen = {}
+
+    def odd(ws):
+        ws.send("[1, 2]")
+        try:
+            ws.recv(timeout=2)
+        except Exception as e:  # closed by the client
+            seen["closed"] = type(e).__name__
+
+    srv, p = run_server(odd)
+    with pytest.raises(ConnectionFailed, match="unexpected greeting"):
+        WebSocketTransport("127.0.0.1", port=p, heartbeat=False)
+    import time
+    for _ in range(40):
+        if "closed" in seen:
+            break
+        time.sleep(0.05)
+    assert seen.get("closed") == "ConnectionClosedOK"
     srv.shutdown()
