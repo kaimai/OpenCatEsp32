@@ -13,9 +13,9 @@ dependencies = ["pyserial>=3.5"]
 
 [project.optional-dependencies]
 ble = ["bleak>=0.22"]
-wifi = ["websockets>=12"]
-all = ["bleak>=0.22", "websockets>=12"]
-dev = ["pytest>=7", "pytest-cov>=4", "bleak>=0.22", "websockets>=12", "build"]
+wifi = ["websockets>=13"]
+all = ["bleak>=0.22", "websockets>=13"]
+dev = ["pytest>=7", "pytest-cov>=4", "bleak>=0.22", "websockets>=13", "build"]
 
 [project.scripts]
 petoi = "petoi.cli:main"

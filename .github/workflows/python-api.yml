@@ -4,6 +4,8 @@ on:
     paths: ["python/**", ".github/workflows/python-api.yml"]
   pull_request:
     paths: ["python/**", ".github/workflows/python-api.yml"]
+permissions:
+  contents: read
 jobs:
   test:
     strategy:
@@ -22,7 +24,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
-      - run: pytest -v --cov=petoi --cov-report=term-missing --cov-fail-under=85
+      - run: pytest -v -W error::DeprecationWarning --cov=petoi --cov-report=term-missing --cov-fail-under=85
       - run: python -m build
       - name: Wheel works in a clean venv
         run: |

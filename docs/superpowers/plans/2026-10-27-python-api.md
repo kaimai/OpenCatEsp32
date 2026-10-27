@@ -1883,7 +1883,7 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - F10: The shared scenario polls joint angles with a ±3° tolerance because head-only moves finish after the echo (`src/reaction.h:1043-1047`, `src/skill.h:414`).
 - G1: A late echo matching any unconfirmed entry (not just the first) drops the entries up to it, and a waited command that times out after swallowing its own token's stale echo clears the list instead of re-adding itself; otherwise one lost echo made every later command of that token fail while retries came less than 15 s apart.
 - G2: `Robot.send` rejects a bare `\r` in the command body, since the firmware truncates there (`src/moduleManager.h:431-435`).
-- G3: WebSocketTransport passes `legacy=True` to `connect()` only when its signature has that parameter (websockets 17.1+), to avoid the direct-connect DeprecationWarning; 12.0, 15.0.1, 16.0, 17.0 and 17.1 all pass the websocket tests.
+- G3: WebSocketTransport passes `legacy=True` to `connect()` only when its signature has that parameter (websockets 17.1+), to avoid the direct-connect DeprecationWarning; 12.0, 15.0.1, 16.0, 17.0 and 17.1 all pass the websocket tests (the floor was later raised to 13; see Final review).
 - H1/H2: WebSocketTransport reads every message on one background thread into a queue, so unrelated traffic can't extend a command's deadline and idle heartbeat replies can't fill websockets' 16-frame queue (which closed idle connections with 1011). `max_queue=None` is passed only where the argument exists (websockets 15+).
 - H3: A task id we sent that never completed is tracked; an `error` carrying one of those ids raises "robot is still busy", since the firmware reports rejections with the running task's id (`src/webServer.h:346-347`, `:487-512`).
 - H4: Wi-Fi and BLE I/O failures become `ConnectionFailed`, and `connect()` closes the transport if anything after opening raises.
@@ -1892,3 +1892,14 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - H7: BLE cleans up on any failure (including Ctrl-C), closes its loop, resets the line buffer on discard, and sizes writes from `max_write_without_response_size` (fallback 20).
 - H8: Clearer errors for Bluetooth port selection on Windows/Linux and for a refused Wi-Fi hello (max 2 clients; `src/webServer.h:150`).
 - H9: README notes the explicit Bluetooth port rule and CLI exit codes; Assumption 9 added.
+
+### Final review
+
+- Floor: `websockets>=13` in the wifi, all and dev extras, because 12.x's sync recv thread is non-daemon and hangs interpreter exit. The `max_queue` check (absent in 13.x, present from 14.0) and `legacy` check (17.1+) are both still needed, so no code was removed.
+- BLE: `close()` is idempotent and `_shutdown_loop` returns early on a closed loop; every BLE operation has a 15 s timeout (`RUN_TIMEOUT`) reported as `ConnectionFailed`.
+- Wi-Fi: the socket is closed on every failed-hello path (timeout, bad JSON, non-dict JSON, `{"type":"error"}`), and a non-dict greeting is rejected.
+- Tests: the noisy-server fake drains input so the client close no longer waits 10 s on older websockets.
+- License: `python/LICENSE` is a byte copy of the root MIT license so the wheel and sdist carry it.
+- Skills: checked against both Instinct files; only `Skill.SLEEP` (`zz`) is Bittle-only and is documented as such.
+- README: runnable Errors snippet, "Quick start" heading, accurate wait wording, repo install first.
+- CI: `permissions: contents: read` and `-W error::DeprecationWarning` on the pytest step; CI still never publishes.

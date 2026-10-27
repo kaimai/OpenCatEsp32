@@ -6,18 +6,20 @@ Control Petoi OpenCat robots (Bittle X, Nybble Q and other ESP32 BiBoard robots)
 
 ## Install
 
+From this repository (the repository root):
+
+```bash
+pip install ./python
+pip install "./python[all]"   # with BLE and Wi-Fi
+```
+
+After the first PyPI release you will be able to install it with pip directly:
+
 ```bash
 pip install petoi            # USB and Bluetooth Classic
 pip install "petoi[ble]"     # adds BLE
 pip install "petoi[wifi]"    # adds Wi-Fi
 pip install "petoi[all]"     # everything
-```
-
-Until the first release, install from this repository instead. From the repository root:
-
-```bash
-pip install ./python
-pip install "./python[all]"   # with BLE and Wi-Fi
 ```
 
 Python 3.9 or newer.
@@ -38,7 +40,7 @@ with petoi.connect("mock") as robot:
 
 This is `examples/00_no_robot.py`. The mock does not model everything the real firmware does.
 
-## Three-line start
+## Quick start
 
 ```python
 import time
@@ -98,9 +100,9 @@ After connecting, the library asks the robot for its model and firmware version.
 
 `Joint` names: `HEAD_PAN`, `HEAD_TILT`, `TAIL`, `LEFT_FRONT_SHOULDER`, `RIGHT_FRONT_SHOULDER`, `RIGHT_BACK_SHOULDER`, `LEFT_BACK_SHOULDER`, `LEFT_FRONT_KNEE`, `RIGHT_FRONT_KNEE`, `RIGHT_BACK_KNEE`, `LEFT_BACK_KNEE`. You can also pass plain joint numbers.
 
-`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `SLEEP`, `HIGH_FIVE`, `HANDSHAKE`. Robots have more skills than this list; reach them with `robot.skill("name")`.
+`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `SLEEP`, `HIGH_FIVE`, `HANDSHAKE`. `Skill.SLEEP` (`zz`) exists only in the Bittle skill list; it is not in the Nybble list (`src/InstinctNybbleESP.h`), so other robots may not recognize it. Robots have more skills than this list; reach them with `robot.skill("name")`.
 
-Every method waits for the robot to confirm it finished. Pass `wait=False` to `skill()`, or use `send(..., wait=False)`, to not wait.
+Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to `skill()`, or use `send(..., wait=False)`, to not wait.
 
 ## Errors
 
@@ -111,6 +113,8 @@ There are two ways a missing reply is reported, depending on which kind of call 
 
 ```python
 import petoi
+
+robot = petoi.connect("mock")
 
 try:
     robot.sit()
