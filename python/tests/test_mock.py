@@ -19,3 +19,11 @@ def test_mock_records_history():
     t = MockTransport()
     Robot(t).sit()
     assert t.history == [b"ksit\n"]
+
+
+def test_mock_ignores_out_of_range_joints_like_the_firmware():
+    t = MockTransport()
+    r = Robot(t)
+    r.joint(16, 10)  # must not raise
+    r.joint(-1, 10)
+    assert t.angles[15] == 0 and len(t.angles) == 16

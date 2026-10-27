@@ -8,7 +8,9 @@ from petoi.transports.base import StreamTransport
 
 class MockTransport(StreamTransport):
     """A pretend robot for learning, docs, and tests. Replies like the firmware:
-    data lines after '=', then the token echo (src/reaction.h:681-686, 1557)."""
+    data lines after '=', then the token echo (src/reaction.h:681-686, 1557).
+
+    Does not model: start angles, 'j<index>', odd argument counts, the 'd' posture."""
 
     MODEL = "Mock Bittle"
     VERSION = "MOCK_260820"
@@ -27,7 +29,8 @@ class MockTransport(StreamTransport):
             args = parse_ints(data[1:].decode())
         if token in ("i", "m", "I", "M"):
             for index, angle in zip(args[::2], args[1::2]):
-                self.angles[index] = angle
+                if 0 <= index < len(self.angles):  # the firmware ignores bad indices (src/reaction.h:882, :1077)
+                    self.angles[index] = angle
         elif token == "?":
             self._out += [self.MODEL, self.VERSION]
         elif token == "j":

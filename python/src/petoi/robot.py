@@ -4,7 +4,7 @@ import threading
 from typing import Dict, List, Literal, Optional, Union
 
 from petoi.constants import Joint, Skill
-from petoi.errors import PetoiError, RobotError, RobotTimeout
+from petoi.errors import RobotError, RobotTimeout
 from petoi.protocol import Reply, encode, parse_ints
 from petoi.transports.base import Transport
 
@@ -32,6 +32,11 @@ class Robot:
         """Send a serial-monitor style command, e.g. "ksit", "i 8 30", "d"."""
         if not command:
             raise ValueError("command is empty")
+        body = command[:-2] if command.endswith("\r\n") else command[:-1] if command.endswith("\n") else command
+        if "\n" in body:
+            raise ValueError("command contains a newline; send one command per call")
+        if "A" <= command[0] <= "Z":
+            raise ValueError(f"{command[0]!r} is a binary command; use send_binary()")
         payload = (command if command.endswith("\n") else command + "\n").encode()
         return self._run(command[0], payload, wait, timeout)
 
@@ -41,7 +46,7 @@ class Robot:
 
     def _run(self, token: str, payload: bytes, wait: bool, timeout: Optional[float]) -> Reply:
         with self._lock:  # one command on the wire at a time
-            return self.transport.command(token, payload, (timeout or self.timeout) if wait else 0)
+            return self.transport.command(token, payload, (self.timeout if timeout is None else timeout) if wait else 0)
 
     def _cmd(self, token: str, *args, wait: bool = True) -> Reply:
         payload = encode(token, *args)
@@ -120,9 +125,9 @@ class Robot:
     def __exit__(self, exc_type, exc, tb) -> None:
         try:
             if exc_type is not None:  # e.g. Ctrl-C mid-walk: don't leave it walking
-                try:
-                    self.stop()
-                except PetoiError:
+                try:  # best effort, short wait; never mask the user's exception
+                    self._run("k", encode("k", Skill.STAND), True, min(self.timeout, 1.0))
+                except Exception:
                     pass
         finally:
             self.close()

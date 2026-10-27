@@ -120,3 +120,43 @@ def test_commands_from_threads_never_overlap():
     for t in threads:
         t.join()
     assert s.max_active == 1
+
+
+def test_send_timeout_zero_does_not_wait():
+    r = robot(auto_echo=False)
+    seen = []
+    real = r.transport.command
+    r.transport.command = lambda token, payload, timeout: (seen.append(timeout), real(token, payload, timeout))[1]
+    r.send("ksit", timeout=0)
+    assert seen == [0]
+
+
+def test_send_rejects_embedded_newline():
+    with pytest.raises(ValueError, match="newline"):
+        robot().send("ksit\nkup")
+
+
+def test_send_keeps_working_with_trailing_line_ending():
+    r = robot()
+    assert r.send("ksit\r\n").completed
+    assert r.transport.written == [b"ksit\r\n"]
+
+
+def test_send_rejects_uppercase_token():
+    with pytest.raises(ValueError, match="send_binary"):
+        robot().send("I8 30")
+
+
+class FailingStop(FakeStream):
+    def write(self, data):
+        if data == b"kup\n":
+            raise OSError("port gone")
+        super().write(data)
+
+
+def test_failed_safe_stop_does_not_mask_the_users_exception():
+    r = Robot(FailingStop())
+    with pytest.raises(KeyboardInterrupt):
+        with r:
+            raise KeyboardInterrupt
+    assert r.transport.closed
