@@ -54,6 +54,7 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
 
 Items 1–4 below: plan part E.
 
+- [ ] **Late echo after 15 s with `wait=False`.** Owed echoes expire after `STALE_SECONDS` (15 s, `src/petoi/transports/base.py`). A skill or uploaded behavior that runs longer, sent with `wait=False`, can leave its late `k`/`K` in front of the next command, which then confirms early or carries an extra line. No built-in skill is estimated over 15 s, but uploaded ones can be.
 - [ ] **Bug: Wi-Fi `wait=False` waits 5 s.** `WebSocketTransport.command` uses `timeout or self._default_timeout`, so 0 means the default (`src/petoi/transports/websocket.py:106`). A long skill sent with `wait=False` returns incomplete after 5 s and the next command gets "busy". Needs a fix and a test.
 - [x] Set a minimum hatchling version and fill in the project metadata (URLs, classifiers, keywords).
 - [x] Add a mypy step to CI.
