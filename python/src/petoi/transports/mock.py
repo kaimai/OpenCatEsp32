@@ -39,6 +39,8 @@ class MockTransport(StreamTransport):
             self._out.append("Gyro state: Update-1 Balance-1 Print-0 Frequency-1")  # src/reaction.h:608-612
         elif data == b"gc\n":
             self._out.append("Calibration done.")  # src/imu.h:1102
+        elif token == "K" and args and args[0] < 0:
+            self._out.append(token)  # a behavior echoes when it starts and when it ends (src/reaction.h:1557, :1609)
         self._out.append(token)
 
     def readline(self, timeout: float) -> Optional[str]:

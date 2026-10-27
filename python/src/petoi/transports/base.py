@@ -55,6 +55,11 @@ class StreamTransport(Transport):
         if not pending:
             self.discard_input()  # nothing is owed, so anything buffered is junk
         self.write(payload)
+        return self.expect(token, timeout)
+
+    def expect(self, token: str, timeout: float) -> Reply:
+        """Wait for one more echo of token without sending; timeout=0 only marks it as owed."""
+        pending = self._unconfirmed
         entry = (token, time.monotonic() + STALE_SECONDS)
         if not timeout:
             pending.append(entry)

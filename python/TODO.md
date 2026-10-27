@@ -12,6 +12,10 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   It covers the 8 plan assumptions (BLE chunking, boot timing, Wi-Fi heartbeat, leg order, skill names,
   head-move timing, 15 s echo window, retries) plus `gyro`, `melody`, `back("left"/"right")` and every `Skill` the model has.
 - [ ] Time every `Skill` on hardware (`pytest tests/hardware -k every_skill -s`); each line prints the measured time next to the firmware-based estimate (`petoi._timing`, longest: Nybble `hunt` about 10.4 s). Petoi's Desktop App tester allows 30 s for `clap`, `pee` and `hunt`, so compare against that too.
+- [ ] **Uploaded skills (`run_skill_data`)** (plan part B):
+  `pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi. `test_largest_upload_arrives_intact`
+  sends 2487 bytes in one unpaced write; if it fails on USB, add paced writes (the Desktop App tester sends 20-byte
+  slices 1 ms apart). Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
 - [ ] **`back("right")` sends `kbkR`.** By reading `src/skill.h:55-58` it resolves by prefix and is mirrored (`:483`),
   the same path `walk("right")` uses. Not yet seen on a robot.
 - [ ] **Bittle with the robot arm.** The hardware test treats any non-Nybble model as plain Bittle, so it cannot
@@ -41,8 +45,6 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   `petoi.setup_wifi(ssid, password) -> ip` (over USB) would close the gap. Limits to handle: an SSID cannot
   contain `%` (the first `%` after the SSID ends it), the reboot drops the serial link, and the Wi-Fi join's own
   timeout has not been looked up.
-- [ ] **Upload a custom skill** (plan part B) (`K` + int8 frames + `~`, or `b64:` over Wi-Fi), as the Desktop App tester's
-  `send_K_skill_data` does. Pairs with Skill Composer exports.
 - [ ] **`flip`/`flipD`/`flipF` left out** (plan part D): they overlap `bf`/`ff` and are not in `randomMind.h:51`, so `RISKY` could not mark them.
   They still work through `skill("name")`.
 - [ ] **Time `calibrate_gyro()`** on MPU6050 and ICM42670 boards; the firmware gives up after 10 s (`src/reaction.h:549`),

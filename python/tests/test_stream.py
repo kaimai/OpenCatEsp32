@@ -77,3 +77,18 @@ def test_genuine_late_echo_then_own_echo_completes():
     s.command("k", b"kfiv\n", timeout=0)
     s.replies[b"ksit\n"] = ["k", "k"]
     assert s.command("k", b"ksit\n", timeout=0.05).completed
+
+
+def test_expect_waits_for_another_echo_without_writing():
+    s = FakeStream(auto_echo=False)
+    s.pending = ["moving", "K"]
+    reply = s.expect("K", timeout=0.05)
+    assert reply.completed and reply.lines == ["moving"] and s.written == []
+
+
+def test_expect_zero_timeout_marks_the_echo_owed():
+    s = FakeStream(auto_echo=False)
+    s.expect("K", timeout=0)
+    s.replies[b"ksit\n"] = ["K", "k"]
+    reply = s.command("k", b"ksit\n", timeout=0.05)
+    assert reply.completed and reply.lines == []

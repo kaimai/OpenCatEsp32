@@ -92,6 +92,7 @@ After connecting, the library asks the robot for its model and firmware version.
 | `stop()` | Stand still |
 | `rest()` | Lie down and turn the servos off |
 | `skill(Skill.HI)` | Run a built-in one-shot skill (a `Skill` or its short name such as `"hi"`) |
+| `run_skill_data(data)` | Upload and run your own skill array (see "Custom skills") |
 | `joint(Joint.HEAD_PAN, 30)` | Move one joint to an angle in degrees (decimals are rounded to the nearest degree) |
 | `move_joints({Joint.HEAD_PAN: 30, Joint.HEAD_TILT: 10})` | Move several joints together. `sequential=True` moves them one after another |
 | `joints()` | Current angle of every joint, as a list indexed by joint number |
@@ -109,6 +110,23 @@ After connecting, the library asks the robot for its model and firmware version.
 Not every robot has every skill. `petoi.constants.ONLY_ON` lists the exceptions: for example the flips and `ROLL` are on Bittle only (not Bittle with the robot arm), and `WASH_FACE` is on Nybble only. `petoi.constants.RISKY` lists flips, falls and test postures the firmware keeps out of random mode; clear some floor space first. `PICK_DOWN` ... `LAUNCH` are made for the robot arm. For a fixed side, use `robot.skill("pickL")` / `"pickR"` (also `put`, `toss`); a bare `"pick"` alternates sides. Robots have more skills than this list; reach them with `robot.skill("name")`.
 
 Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to any movement method (or to `send()`) to send the command and return at once without waiting.
+
+## Custom skills
+
+`run_skill_data(data)` sends a skill array in the layout of the firmware's `src/Instinct*.h` files (Skill Composer skills use it too), runs it, and returns when it is done:
+
+```python
+up = [0, 0, 0, 0, 0, 0, 0, 0, 30, 30, 30, 30, 30, 30, 30, 30]   # Bittle's "up"
+look = [30] + up[1:]                                               # head turned
+robot.run_skill_data([1, 0, 0, 1] + look)                          # a posture
+robot.run_skill_data([-2, 0, 0, 1, 0, 0, 0] + look + [8, 10, 0, 0] + up + [8, 0, 0, 0])  # a behavior
+```
+
+- Header: frame count (1 posture, more than 1 gait, negative behavior), expected roll, expected pitch, angle ratio (1, or 2 to double every angle). A behavior adds three loop values: start row, end row, and how many times those rows run.
+- Frames: 16 angles for a posture; 8 for a gait on Bittle and Nybble (12 on other models); for a behavior, 16 angles plus speed (8 = 1 degree per step, 0 = jump), pause (×50 ms), and two gyro trigger values (0, 0 for none).
+- Postures return once reached and gaits once started (they keep going until `stop()`). Behaviors return when finished; over Wi-Fi, a behavior returns as it starts.
+- Rejected before sending: a length that doesn't match the header, values outside -128..127, the value 126 (it is the end marker `~`; use 125 or 127), a negative loop count (it would loop forever), and more than 124 behavior frames.
+- The robot also saves each upload to flash, so avoid uploading in a tight loop.
 
 ## Errors
 

@@ -33,3 +33,9 @@ def test_mock_reports_gyro_state_and_calibrates():
     r = Robot(MockTransport())
     assert r.gyro_state() == {"update": True, "balance": True, "print": False, "fine": True}
     assert r.calibrate_gyro().completed
+
+
+def test_mock_echoes_a_behavior_twice_like_the_firmware():
+    r = Robot(MockTransport())
+    assert r.run_skill_data([-1, 0, 0, 1, 0, 0, 0] + [0] * 20).completed
+    assert r.info()["model"] == MockTransport.MODEL

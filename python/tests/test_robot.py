@@ -4,8 +4,10 @@ import time
 import pytest
 
 from conftest import FakeStream
+from petoi._timing import skill_seconds
 from petoi.constants import Joint, Skill
 from petoi.errors import RobotError, RobotTimeout
+from petoi.protocol import encode
 from petoi.robot import Robot
 from petoi.transports.base import STALE_SECONDS
 
@@ -311,3 +313,105 @@ def test_skill_timeout_error_names_the_skill_limit():
 def test_default_skill_timeout_fits_between_stale_window_and_wifi_abort():
     # at least the 15 s stale window, below the Wi-Fi server's 45 s task abort (src/webServer.h:53)
     assert STALE_SECONDS <= Robot(FakeStream()).skill_timeout < 45
+
+
+UP = [0, 0, 0, 0, 0, 0, 0, 0, 30, 30, 30, 30, 30, 30, 30, 30]  # Bittle "up" (src/InstinctBittleESP.h:1898-1900)
+POSTURE = [1, 0, 0, 1] + UP
+STILL = UP + [8, 0, 0, 0]  # speed 8/8 = 1 degree a step, no pause, no gyro trigger
+HEAD = [30] + UP[1:] + [8, 0, 0, 0]
+
+
+def behavior(*frames, loop=(0, 0, 0)):
+    return [-len(frames), 0, 0, 1, *loop] + [v for f in frames for v in f]
+
+
+def test_skill_data_is_sent_as_one_binary_command():
+    r = robot()
+    assert r.run_skill_data(POSTURE).completed
+    assert r.transport.written == [b"K\x01\x00\x00\x01" + bytes(UP) + b"~"]
+
+
+@pytest.mark.parametrize("width", [8, 12])
+def test_gait_frames_may_be_8_or_12_wide(width):
+    r = robot()
+    r.run_skill_data([2, 0, 0, 1] + [10] * (2 * width))
+    assert r.transport.written[-1] == encode("K", 2, 0, 0, 1, *([10] * (2 * width)))
+
+
+def test_bittle_gait_must_be_8_wide():
+    r = robot()
+    r.model = "Bittle X"
+    with pytest.raises(ValueError, match="needs 20 values"):
+        r.run_skill_data([2, 0, 0, 1] + [10] * 24)
+
+
+def test_behavior_waits_for_its_second_echo():
+    data = behavior(STILL, HEAD, STILL)
+    r = robot({encode("K", *data): ["K", "note", "K"]})
+    reply = r.run_skill_data(data)
+    assert reply.completed and reply.lines == ["note"]
+
+
+def test_behavior_without_end_echo_raises():
+    data = behavior(STILL, HEAD)
+    r = robot({encode("K", *data): ["K"]})  # started, never finished
+    with pytest.raises(RobotTimeout, match="uploaded skill"):
+        r.run_skill_data(data)
+
+
+def test_behavior_wait_false_owes_both_echoes():
+    r = robot(auto_echo=False)
+    r.run_skill_data(behavior(STILL, HEAD), wait=False)
+    r.transport.replies[b"ksit\n"] = ["K", "K", "k"]  # both late K echoes arrive during the next command
+    assert r.sit().lines == []
+
+
+@pytest.mark.parametrize(
+    "data, message",
+    [
+        ([1, 0, 0], "header"),
+        ([0, 0, 0, 1], "cannot be 0"),
+        ([1, 0, 0, 3] + UP, "angle ratio"),
+        ([1, 0, 0, 1] + UP[:-1], "needs 20 values"),
+        ([2, 0, 0, 1] + [0] * 20, "needs 20 or 28 values"),
+        (behavior(STILL, loop=(0, 0, -1)), "forever"),
+        (behavior(STILL, STILL, loop=(0, 2, 3)), "loop rows"),
+        ([1, 0, 0, 1] + UP[:-1] + [126], "126 at index 19"),
+        ([1, 0, 0, 1] + UP[:-1] + [200], "int8"),
+        (behavior(*[STILL] * 125), "too long"),
+        (["1", 0, 0, 1] + UP, "integers"),
+    ],
+)
+def test_skill_data_rejects_what_the_robot_would_misread(data, message):
+    r = robot()
+    with pytest.raises(ValueError, match=message):
+        r.run_skill_data(data)
+    assert r.transport.written == []
+
+
+def test_behavior_time_from_frame_0_counts_pauses_and_loops():
+    pause = UP + [0, 20, 0, 0]  # jump, then 20 x 50 ms = 1 s (src/skill.h:355)
+    start = UP  # the robot is already at frame 0 when the behavior starts (src/reaction.h:1414)
+    assert 2.0 <= skill_seconds(behavior(pause, pause), start) < 2.1
+    assert 6.0 <= skill_seconds(behavior(pause, pause, loop=(0, 1, 3)), start) < 6.1  # rows 0-1 run three times
+
+
+def test_behavior_waits_robot_timeout_plus_one_and_a_half_estimates():
+    data = [-2, 0, 0, 2, 0, 0, 0] + STILL + HEAD  # angle ratio 2: frame 0 is UP doubled
+    r = robot({encode("K", *data): ["K", "K"]})
+    seen = []
+    expect = r.transport.expect
+    r.transport.expect = lambda token, timeout: seen.append(timeout) or expect(token, timeout)
+    r.run_skill_data(data)
+    # command() waits for the start echo through expect() too
+    assert seen == [0.2, pytest.approx(0.2 + 1.5 * skill_seconds(data, [2 * a for a in UP]))]
+    assert skill_seconds(data, [2 * a for a in UP]) == pytest.approx((1 + 1 + 61) * 0.008)  # 60 degrees doubled
+
+
+def test_posture_and_gait_uploads_keep_the_short_timeout():
+    r = robot()
+    seen = recorded_timeouts(r)
+    r.run_skill_data(POSTURE)
+    r.run_skill_data([2, 0, 0, 1] + [10] * 16)
+    r.run_skill_data(POSTURE, timeout=3)
+    assert seen == [0.2, 0.2, 3]

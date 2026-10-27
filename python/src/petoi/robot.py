@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import operator
 import re
 import threading
 from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
+from petoi._timing import DOF, skill_seconds
 from petoi.constants import Joint, Skill
 from petoi.errors import RobotError, RobotTimeout
 from petoi.protocol import Reply, encode, parse_ints
-from petoi.transports.base import Transport
+from petoi.transports.base import StreamTransport, Transport
 
 Direction = Literal["forward", "left", "right"]
 _DIRECTIONS = {"forward": "F", "left": "L", "right": "R"}  # 'R' mirrors 'L' (src/skill.h:501)
 _GYRO_FLAGS = {"Update": "update", "Balance": "balance", "Print": "print", "Frequency": "fine"}  # src/reaction.h:609-612
 _CALIBRATE_SECONDS = 20  # 6 s of beeps, up to 10 s calibrating, 3 s settling (src/reaction.h:519-562)
+_SKILL_ROOM = 2507 - 1 - 20  # BUFF_LEN - 1 - CMD_LEN: leaves room for the next k command (src/OpenCat.h:438, :443; src/skill.h:131-137)
 
 
 class Robot:
@@ -69,6 +72,30 @@ class Robot:
     def skill(self, name: Union[Skill, str], wait: bool = True, timeout: Optional[float] = None) -> Reply:
         """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes (up to skill_timeout)."""
         return self._cmd("k", name, wait=wait, timeout=self.skill_timeout if timeout is None else timeout)
+
+    def run_skill_data(self, data: Sequence[int], wait: bool = True, timeout: Optional[float] = None) -> Reply:
+        """Upload a skill array in the Instinct*.h layout and run it; waits until a behavior ends."""
+        try:
+            values = [operator.index(v) for v in data]
+        except TypeError:
+            raise ValueError("skill data must be integers") from None
+        bittle_like = any(n in (self.model or "").lower() for n in ("bittle", "nybble"))
+        _check_skill_data(values, (8,) if bittle_like else (8, 12))  # WALKING_DOF (src/OpenCat.h:249-256)
+        payload = encode("K", *values)
+        # a behavior echoes K as it starts and again when it ends (src/reaction.h:1557, :1609); Wi-Fi sees only the first (:1565)
+        stream = self.transport if values[0] < 0 and isinstance(self.transport, StreamTransport) else None
+        if timeout is None:
+            timeout = self.timeout
+            if stream is not None:  # the robot is already at frame 0 when the behavior starts (src/reaction.h:1414)
+                timeout += 1.5 * skill_seconds(values, [a * values[3] for a in values[7:7 + DOF]])
+        with self._lock:
+            reply = self.transport.command("K", payload, (self.timeout if stream is not None else timeout) if wait else 0)
+            if stream is not None and (reply.completed or not wait):
+                end = stream.expect("K", timeout if wait else 0)
+                reply = Reply("K", reply.lines + end.lines, end.completed)
+        if wait and not reply.completed:
+            raise RobotTimeout("robot did not confirm the uploaded skill in time; check power and the connection, or pass a longer timeout")
+        return reply
 
     def sit(self, wait: bool = True) -> Reply:
         """Sit down."""
@@ -202,3 +229,34 @@ def _direction(name: str) -> str:
 
 def _degrees(angle: float) -> int:
     return round(angle)  # the firmware's atoi would cut 30.7 to 30 (src/reaction.h:877)
+
+
+def _check_skill_data(values: List[int], gait_widths: Tuple[int, ...]) -> None:
+    # layout: src/skill.h:118-126, :144-157
+    if len(values) < 4:
+        raise ValueError("skill data needs a header: frames, roll, pitch, angle ratio")
+    for i, v in enumerate(values):
+        if not -128 <= v <= 127:
+            raise ValueError(f"value {v} at index {i} is outside the int8 range -128..127")
+        if v == 126:
+            raise ValueError(f"value 126 at index {i} is the end marker '~' and could cut the skill short; use 125 or 127")
+    period, ratio = values[0], values[3]
+    if period == 0:
+        raise ValueError("frame count (first value) cannot be 0: 1 is a posture, more a gait, negative a behavior")
+    if ratio not in (1, 2):
+        raise ValueError(f"angle ratio (fourth value) must be 1 or 2, got {ratio}")
+    header, frames = (4 if period > 0 else 7), abs(period)
+    widths = (DOF,) if period == 1 else gait_widths if period > 1 else (DOF + 4,)
+    body = len(values) - header
+    if body not in [frames * w for w in widths]:
+        kind = "posture" if period == 1 else "gait" if period > 1 else "behavior"
+        need = " or ".join(str(header + frames * w) for w in widths)
+        raise ValueError(f"a {kind} with {frames} frames needs {need} values, got {len(values)}")
+    if body > _SKILL_ROOM:
+        raise ValueError(f"skill data is too long: {body} angle values, the robot keeps at most {_SKILL_ROOM}")
+    if period < 0:
+        start, end, cycles = values[4:7]
+        if cycles < 0:
+            raise ValueError("a loop count (seventh value) below 0 loops forever (src/skill.h:282); use 0 or 1 for no loop")
+        if cycles >= 2 and not 0 <= start <= end < frames:
+            raise ValueError(f"loop rows {start}..{end} must lie within the {frames} frames")
