@@ -96,6 +96,7 @@ After connecting, the library asks the robot for its model and firmware version.
 | `move_joints({Joint.HEAD_PAN: 30, Joint.HEAD_TILT: 10})` | Move several joints together. `sequential=True` moves them one after another |
 | `joints()` | Current angle of every joint, as a list indexed by joint number |
 | `beep(note, duration)` | Play a note |
+| `gyro(on)` | Turn gyro balancing on or off (off before tricks it would fight) |
 | `info()` | `{"model": ..., "version": ...}` |
 
 `Joint` names: `HEAD_PAN`, `HEAD_TILT`, `TAIL`, `LEFT_FRONT_SHOULDER`, `RIGHT_FRONT_SHOULDER`, `RIGHT_BACK_SHOULDER`, `LEFT_BACK_SHOULDER`, `LEFT_FRONT_KNEE`, `RIGHT_FRONT_KNEE`, `RIGHT_BACK_KNEE`, `LEFT_BACK_KNEE`. You can also pass plain joint numbers.

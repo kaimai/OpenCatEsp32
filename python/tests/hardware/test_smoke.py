@@ -43,3 +43,9 @@ def test_wifi_survives_idle_minute():
     with petoi.connect(os.environ["PETOI_WS"]) as r:
         time.sleep(60)
         assert r.info()["model"]
+
+
+def test_gyro_off_then_on_confirms_and_next_command_is_clean(robot):
+    robot.gyro(False)  # 'gb' prints 'g' twice; the second must not leak
+    assert robot.info()["model"] == robot.model
+    robot.gyro(True)

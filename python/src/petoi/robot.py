@@ -112,6 +112,10 @@ class Robot:
     def beep(self, note: int, duration: int) -> Reply:
         return self._cmd("b", note, duration)
 
+    def gyro(self, on: bool) -> Reply:
+        """Turn gyro balancing on or off. Turn it off before tricks it would fight."""
+        return self._cmd("g", "B" if on else "b")  # explicit; bare 'g' toggles (src/reaction.h:503-506)
+
     def info(self) -> Dict[str, str]:
         reply = self._cmd("?")  # src/reaction.h:405-406
         if len(reply.lines) < 2:

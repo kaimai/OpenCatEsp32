@@ -165,3 +165,17 @@ def test_failed_safe_stop_does_not_mask_the_users_exception():
 def test_send_rejects_bare_carriage_return():
     with pytest.raises(ValueError, match="carriage return"):
         robot().send("ksit\rkup")
+
+
+@pytest.mark.parametrize("on, sent", [(True, b"gB\n"), (False, b"gb\n")])
+def test_gyro_sets_balancing_explicitly(on, sent):
+    r = robot()
+    assert r.gyro(on).completed
+    assert r.transport.written[-1] == sent
+
+
+def test_gyro_off_double_echo_does_not_leak_into_next_reply():
+    # gb prints 'g' before its echo (src/reaction.h:579, :1557)
+    r = robot({b"gb\n": ["g", "g"], b"?\n": ["Bittle X", "B10_260820", "?"]})
+    r.gyro(False)
+    assert r.info() == {"model": "Bittle X", "version": "B10_260820"}
