@@ -84,3 +84,37 @@ def test_line_buffer_reassembles_chunks():
     assert buf.feed(b"Bit") == []
     assert buf.feed(b"tle X\r\nB10") == ["Bittle X"]
     assert buf.feed(b"\r\n?\r\n") == ["B10", "?"]
+
+
+def test_token_must_be_ascii():
+    with pytest.raises(ValueError, match="ASCII"):
+        encode("é")
+
+
+def test_binary_args_must_be_integers():
+    with pytest.raises(ValueError, match="integers, got 1.7"):
+        encode("I", 8, 1.7)
+    with pytest.raises(ValueError, match="integers"):
+        encode("I", "8")
+
+
+def test_ascii_args_cannot_contain_line_breaks():
+    with pytest.raises(ValueError, match="line break"):
+        encode("k", "sit\nkup")
+    with pytest.raises(ValueError, match="line break"):
+        encode("k", "sit\r")
+
+
+@pytest.mark.parametrize("token", ["X", "R", "W"])
+def test_xrw_binary_tokens_reject_bytes_the_firmware_strips(token):
+    for bad in (10, 13):
+        with pytest.raises(ValueError, match="moduleManager.h:427"):
+            encode(token, 1, bad)
+    for bad in (9, 32):
+        with pytest.raises(ValueError, match="moduleManager.h:427"):
+            encode(token, bad, 1)
+    assert encode(token, 1, 32) == token.encode() + bytes([1, 32]) + b"~"  # only leading ones are trimmed
+
+
+def test_other_binary_tokens_allow_newline_bytes():
+    assert encode("I", 10, 13) == b"I\x0a\x0d~"

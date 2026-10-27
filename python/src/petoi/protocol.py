@@ -6,6 +6,7 @@ src/reaction.h (completion echo). This module does no I/O.
 
 from __future__ import annotations
 
+import operator
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -13,6 +14,7 @@ from typing import List, Union
 
 BINARY_TERMINATOR = b"~"
 _TILDE = 126
+_STRIPPED_BINARY = "XRW"
 
 
 def _arg(a: Union[int, str]) -> str:
@@ -27,17 +29,33 @@ def encode(token: str, *args: Union[int, str]) -> bytes:
     Lowercase tokens are ASCII ("i8 30\\n"); uppercase tokens are binary,
     one signed byte per argument, ended by '~'.
     """
-    if len(token) != 1:
-        raise ValueError(f"token must be one character, got {token!r}")
+    if len(token) != 1 or not token.isascii():
+        raise ValueError(f"token must be one ASCII character, got {token!r}")
     if token.isupper():
-        values = [int(_arg(a)) for a in args]
+        values = []
+        for a in args:
+            raw = a.value if isinstance(a, Enum) else a
+            try:
+                values.append(operator.index(raw))
+            except TypeError:
+                raise ValueError(f"binary arguments must be integers, got {raw!r}") from None
+        if token in _STRIPPED_BINARY:
+            # the firmware strips \r \n anywhere and leading spaces/tabs from these (src/moduleManager.h:427-436)
+            if any(v in (10, 13) for v in values) or (values and values[0] in (9, 32)):
+                raise ValueError(
+                    f"{token} arguments cannot contain 10 or 13, or start with 9 or 32: "
+                    "the firmware strips those bytes (src/moduleManager.h:427)"
+                )
         for v in values:
             if not -128 <= v <= 127:
                 raise ValueError(f"binary argument {v} is outside the int8 range -128..127")
             if v == _TILDE:
                 raise ValueError("binary argument 126 collides with the '~' terminator; use 125 or 127")
         return token.encode() + bytes(v & 0xFF for v in values) + BINARY_TERMINATOR
-    return (token + " ".join(_arg(a) for a in args) + "\n").encode()
+    text = " ".join(_arg(a) for a in args)
+    if "\n" in text or "\r" in text:
+        raise ValueError("arguments cannot contain a line break; it would split the command")
+    return (token + text + "\n").encode()
 
 
 _DATA_MARKER = "="
