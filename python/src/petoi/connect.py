@@ -13,6 +13,7 @@ SSP_MARK = "_SSP"  # src/bluetoothManager.h:73
 MIN_FIRMWARE_DATE = "260820"  # firmware in this repo (src/OpenCat.h:80); the version hardware tests run against
 _USB_HINTS = ("usb", "wch", "ch340", "ch910", "cp210", "uart", "acm")
 _IGNORE = ("bluetooth-incoming-port", "debug-console")
+_LOCAL = re.compile(r"^[^/:]+\.local(:\d+)?$")
 _IP = re.compile(r"^\d{1,3}(\.\d{1,3}){3}(:\d+)?$")
 
 
@@ -24,7 +25,7 @@ def classify(target: Optional[str]) -> Tuple[str, Optional[str]]:
         return (low, None)
     if low.startswith("ble:"):
         return ("ble", target[4:])
-    if low.startswith("ws://") or _IP.match(target) or low.endswith(".local"):
+    if low.startswith("ws://") or _IP.match(target) or _LOCAL.match(low):
         return ("wifi", target)
     return ("serial", target)
 
@@ -41,7 +42,9 @@ def pick_serial_port(ports, bluetooth: bool) -> str:
         return matches[0].device
     if not matches:
         what = "paired Bluetooth (_SSP)" if bluetooth else "USB"
-        raise ConnectionFailed(f"No robot {what} port found. Ports seen: {[p.device for p in ports] or 'none'}")
+        hint = (" On Windows or Linux the Bluetooth port has no _SSP in its name; pass the Bluetooth COM port "
+                "or /dev/rfcomm* port explicitly.") if bluetooth else ""
+        raise ConnectionFailed(f"No robot {what} port found. Ports seen: {[p.device for p in ports] or 'none'}.{hint}")
     raise ConnectionFailed(f"Several possible ports, pass one: {', '.join(p.device for p in matches)}")
 
 
@@ -84,7 +87,12 @@ def connect(target: Optional[str] = None, timeout: float = 5.0, check_firmware: 
     """Connect to a robot. target: None (USB), a port name, "bluetooth", "ble",
     "ble:<address>", a Wi-Fi address, or "mock"."""
     kind, value = classify(target)
-    robot = Robot(_open(kind, value, timeout), timeout=timeout)
-    if check_firmware:
-        _check_firmware(robot)
+    transport = _open(kind, value, timeout)
+    try:
+        robot = Robot(transport, timeout=timeout)
+        if check_firmware:
+            _check_firmware(robot)
+    except BaseException:
+        transport.close()
+        raise
     return robot

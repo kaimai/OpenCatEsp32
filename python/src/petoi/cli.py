@@ -24,10 +24,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         with connect(args.to) as robot:
             reply = robot.send(args.command)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     except PetoiError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
-    print(reply.text or ("ok" if reply.completed else "no reply"))
+    if not reply.completed:
+        if reply.text:
+            print(reply.text)
+        print("no reply", file=sys.stderr)
+        return 1
+    print(reply.text or "ok")
     return 0
 
 

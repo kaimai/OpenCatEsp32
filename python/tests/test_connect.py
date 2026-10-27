@@ -1,4 +1,5 @@
 import builtins
+import sys
 
 import pytest
 from serial.tools.list_ports_common import ListPortInfo
@@ -27,6 +28,7 @@ def port(device, description=""):
         ("192.168.4.1", ("wifi", "192.168.4.1")),
         ("ws://10.0.0.5:81", ("wifi", "ws://10.0.0.5:81")),
         ("bittle.local", ("wifi", "bittle.local")),
+        ("bittle.local:81", ("wifi", "bittle.local:81")),
         ("mock", ("mock", None)),
     ],
 )
@@ -85,3 +87,17 @@ def test_connect_ble_without_bleak_gives_install_hint(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
     with pytest.raises(ConnectionFailed, match=r"petoi\[ble\]"):
         petoi.connect("ble")
+
+
+def test_transport_is_closed_if_firmware_check_raises(monkeypatch):
+    closed = []
+    monkeypatch.setattr(MockTransport, "close", lambda self: closed.append(True))
+    monkeypatch.setattr(sys.modules["petoi.connect"], "_check_firmware", lambda robot: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError):
+        petoi.connect("mock")
+    assert closed == [True]
+
+
+def test_bluetooth_without_match_explains_explicit_port_on_windows_and_linux():
+    with pytest.raises(ConnectionFailed, match="rfcomm"):
+        pick_serial_port([], bluetooth=True)
