@@ -28,8 +28,19 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
 
 ## Needs the owner
 
-- [ ] **PyPI name.** `petoi` and `petoi-robot` were both unregistered on 2026-10-27. Uploading needs the owner's
-  PyPI account. Decide between publishing 0.1.0 before hardware testing, or a 0.0.1 placeholder to hold the name.
+- [ ] **PyPI name.** The package is named `petoi` (`pyproject.toml`). Uploading needs the owner's PyPI account
+  (consider a Petoi organization account). Decide between publishing 0.1.0 before hardware testing, or a 0.0.1
+  placeholder to hold the name. Optionally also hold `opencat-robot`. Availability checked on 2026-10-27:
+
+  | Name | Status |
+  |---|---|
+  | `petoi` (current choice) | free |
+  | `petoi-robot` (name inside Petoi's MindPlus `PetoiRobot` library) | free |
+  | `opencat-robot` | free |
+  | `petoi-opencat` | free |
+  | `opencatesp32` | free |
+  | `opencat` / `OpenCat` | taken: unrelated desktop-cat app, v0.2.1 (github.com/Jacobzwj/opencat) |
+  | `open-cat` | free on lookup, but likely refused as too close to `opencat` (unverified) |
 - [ ] **Branch:** merge locally, open a PR, keep, or discard. Hardware testing first is the safer order.
 - [ ] **Backup ref.** `refs/original/refs/heads/feature/python-api` is left from the commit-trailer rewrite.
   Delete it once the history is confirmed: `git update-ref -d refs/original/refs/heads/feature/python-api`.
