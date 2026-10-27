@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "petoi"
+version = "0.1.0"
+description = "Control Petoi OpenCat robots (Bittle X, Nybble Q) from Python over USB, Bluetooth, BLE, or Wi-Fi"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+dependencies = ["pyserial>=3.5"]
+
+[project.optional-dependencies]
+ble = ["bleak>=0.22"]
+wifi = ["websockets>=12"]
+all = ["bleak>=0.22", "websockets>=12"]
+dev = ["pytest>=7", "pytest-cov>=4", "bleak>=0.22", "websockets>=12", "build"]
+
+[project.scripts]
+petoi = "petoi.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/petoi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["hardware: needs a real robot (set PETOI_PORT, PETOI_BT, PETOI_BLE, or PETOI_WS)"]
+
+[tool.coverage.run]
+# bleak I/O is only exercised by the hardware tests (see Test Plan L5)
+omit = ["*/petoi/transports/ble.py"]
