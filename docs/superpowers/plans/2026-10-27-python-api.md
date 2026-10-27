@@ -27,6 +27,7 @@
 | BLE is Nordic UART: service `6E400001-…`, robot RX `6E400002-…`, robot TX `6E400003-…`; device name contains `_BLE` | `src/bleCommon.h:6-8`, `src/bleUart.h:99` |
 | Bluetooth Classic SPP device name contains `_SSP` | `src/bluetoothManager.h:73` |
 | Wi-Fi: WebSocket on port 81, JSON `{"type":"command","taskId":…,"commands":[…]}`; replies `status: running/completed/error` with `results`; `b64:` prefix for binary; heartbeat timeout 40 s; one task at a time; max 2 clients | `src/webServer.h:51-59, 248-357, 380-400, 445-486` |
+| `X`, `R`, `W` tokens are binary but still have `\r`/`\n` stripped and leading spaces trimmed | `src/moduleManager.h:427-436` |
 | Skill names (`sit up balance str hi pu ck pee snf scrh zz fiv hsk`, gaits `wk tr cr bk` + `F`/`L`; `R` mirrored from `L`) | `src/InstinctBittleESP.h:2486`, `src/skill.h:501` |
 
 ## Assumptions to verify on hardware (cannot confirm from source alone)
@@ -37,6 +38,8 @@
 4. Every token used by the high-level API echoes itself.
 5. Leg order inside each joint group is left-front, right-front, right-back, left-back (from OpenCat docs, not from this source).
 6. Skill meanings (e.g. `fiv` = high five, `hsk` = handshake) match their names.
+7. Head-only joint moves after a posture finish after the echo; scenario uses a ±3° tolerance and polling.
+8. No one-shot skill takes longer than STALE_SECONDS (15 s) to echo; a later echo could still be mistaken for a newer command.
 
 The hardware checklist in the Test Plan verifies each of these and records the result.
 
@@ -1864,3 +1867,16 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - Spec coverage: four links (Tasks 5, 9, 10, 11) + mock (8); raw + high-level (7); pip packaging (1, 14); replaces the serial tools with an importable API (whole plan). Best-practice additions: raise on timeout (7), typed surface + `Joint`/`Skill` + `py.typed` (1, 6, 7), mock (8), thread lock (7), firmware check (11), safe stop on exception (7). Test plan levels L1–L6 each map to tasks.
 - Names are the same across tasks: `encode`, `Reply`, `collect_reply`, `LineBuffer`, `parse_ints`, `Transport.command(token, payload, timeout)`, `StreamTransport.write/readline/discard_input`, `Robot.send/send_binary/skill/joint/move_joints/joints/info`, `Robot.model/firmware`, `Joint`, `Skill`, `RobotTimeout`, `MockTransport.MODEL/VERSION/history`, `connect`, `classify`, `pick_serial_port`, `list_ports_info`, `MIN_FIRMWARE_DATE`.
 - Known gaps are listed in the Test Plan.
+
+## Amendments after code review (2026-10-27)
+
+- F1: StreamTransport tracks unconfirmed tokens (expire after `STALE_SECONDS` = 15 s) and consumes their late echoes, because the protocol has no command IDs and one-shot skills echo only when finished.
+- F2: SerialTransport reads through `LineBuffer` in short slices so a timeout never returns a partial line.
+- F3: Boot wait returns on early silence only if nothing was printed; once output starts it waits for `Ready!` (default 20 s) and warns otherwise, since boot has long silent stretches and a Y/n prompt (`src/imu.h:739+`, `:1013`).
+- F4: The port is closed if the boot wait fails, and `serial.SerialException` becomes `ConnectionFailed`.
+- F5: `Transport.command` timeout 0 means do not wait; `Robot.send(..., timeout=0)` honors it instead of falling back to the default.
+- F6: `encode` rejects non-ASCII tokens, non-integer binary args, line breaks in ASCII args, and (for `X`, `R`, `W`) bytes 10/13 and a leading 9/32 that the firmware strips (`src/moduleManager.h:427-436`).
+- F7: `Robot.send` rejects embedded newlines (would split the command) and uppercase tokens (use `send_binary()`).
+- F8: `__exit__` stops the robot best-effort with a 1 s wait and catches any `Exception`, so it never masks the user's exception.
+- F9: MockTransport ignores out-of-range joint indices like the firmware (`src/reaction.h:882`, `:1077`) and documents what it does not model.
+- F10: The shared scenario polls joint angles with a ±3° tolerance because head-only moves finish after the echo (`src/reaction.h:1043-1047`, `src/skill.h:414`).
