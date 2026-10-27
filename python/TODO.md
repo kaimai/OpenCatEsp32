@@ -11,11 +11,7 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   (add `PETOI_BT`, `PETOI_BLE`, `PETOI_WS` for the other links; `PETOI_RISKY=1` with the robot on the floor).
   It covers the 8 plan assumptions (BLE chunking, boot timing, Wi-Fi heartbeat, leg order, skill names,
   head-move timing, 15 s echo window, retries) plus `gyro`, `melody`, `back("left"/"right")` and every `Skill` the model has.
-- [ ] **Long skills vs the 5 s default timeout** (plan part C). `skill()` waits for the skill to finish, but `robot.timeout`
-  defaults to 5 s. Petoi's own `PythonSocketTester.py` (DesktopAppRelease `pyUI/`) gives `clap`, `pee`, `hunt`
-  and long `b64:` payloads 30 s, and `b64:Q…` payloads or `B` melodies of over 10 values 120 s, which suggests some skills run longer than 5 s. Time every
-  `Skill` on hardware. If any exceed 5 s, either raise the wait for skills only or estimate each skill's length
-  from its frame count. Note the Wi-Fi server gives up on a task after 45 s (`src/webServer.h:53`).
+- [ ] Time every `Skill` on hardware (`-k every_skill -s`) and compare it with the estimate column.
 - [ ] **`back("right")` sends `kbkR`.** By reading `src/skill.h:55-58` it resolves by prefix and is mirrored (`:483`),
   the same path `walk("right")` uses. Not yet seen on a robot.
 - [ ] **Bittle with the robot arm.** The hardware test treats any non-Nybble model as plain Bittle, so it cannot

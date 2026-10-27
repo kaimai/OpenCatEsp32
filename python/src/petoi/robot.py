@@ -20,11 +20,13 @@ class Robot:
 
     High-level methods raise RobotTimeout if the robot doesn't confirm.
     send()/send_binary() return the Reply and never raise on timeout.
+    skill() waits up to skill_timeout, since one-shot skills confirm only when finished.
     """
 
-    def __init__(self, transport: Transport, timeout: float = 5.0):
+    def __init__(self, transport: Transport, timeout: float = 5.0, skill_timeout: float = 30.0):
         self.transport = transport
         self.timeout = timeout
+        self.skill_timeout = skill_timeout  # below Wi-Fi's 45 s task abort (src/webServer.h:53)
         self.model: Optional[str] = None  # set by connect()
         self.firmware: Optional[str] = None  # set by connect()
         self._lock = threading.Lock()
@@ -64,45 +66,46 @@ class Robot:
 
     # --- postures and skills ----------------------------------------------
 
-    def skill(self, name: Union[Skill, str], wait: bool = True) -> Reply:
-        """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes."""
-        return self._cmd("k", name, wait=wait)
+    def skill(self, name: Union[Skill, str], wait: bool = True, timeout: Optional[float] = None) -> Reply:
+        """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes (up to skill_timeout)."""
+        return self._cmd("k", name, wait=wait, timeout=self.skill_timeout if timeout is None else timeout)
 
     def sit(self, wait: bool = True) -> Reply:
         """Sit down."""
-        return self.skill(Skill.SIT, wait)
+        return self._cmd("k", Skill.SIT, wait=wait)
 
     def stand(self, wait: bool = True) -> Reply:
         """Stand up."""
-        return self.skill(Skill.STAND, wait)
+        return self._cmd("k", Skill.STAND, wait=wait)
 
     def stop(self, wait: bool = True) -> Reply:
         """Stop walking and stand still."""
-        return self.skill(Skill.STAND, wait)
+        return self._cmd("k", Skill.STAND, wait=wait)
 
     def rest(self, wait: bool = True) -> Reply:
         """Lie down and turn the servos off."""
         return self._cmd("d", wait=wait)
 
     # --- gaits (keep going until stop()) ---------------------------------
+    # They echo when they start (src/reaction.h:1555-1565), so they keep the short timeout.
 
     def walk(self, direction: Direction = "forward", wait: bool = True) -> Reply:
         """Start walking forward, left or right until stop()."""
-        return self.skill("wk" + _direction(direction), wait)
+        return self._cmd("k", "wk" + _direction(direction), wait=wait)
 
     def trot(self, direction: Direction = "forward", wait: bool = True) -> Reply:
         """Start trotting forward, left or right until stop()."""
-        return self.skill("tr" + _direction(direction), wait)
+        return self._cmd("k", "tr" + _direction(direction), wait=wait)
 
     def crawl(self, direction: Direction = "forward", wait: bool = True) -> Reply:
         """Start crawling forward, left or right until stop()."""
-        return self.skill("cr" + _direction(direction), wait)
+        return self._cmd("k", "cr" + _direction(direction), wait=wait)
 
     def back(self, direction: Optional[Literal["left", "right"]] = None, wait: bool = True) -> Reply:
         """Start walking backward, straight or turning left or right, until stop()."""
         if direction not in (None, "left", "right"):
             raise ValueError(f"direction must be left, right or None, got {direction!r}")
-        return self.skill("bk" + (_direction(direction) if direction else ""), wait)
+        return self._cmd("k", "bk" + (_direction(direction) if direction else ""), wait=wait)
 
     # --- joints -----------------------------------------------------------
 

@@ -7,6 +7,8 @@ import petoi
 import scenario
 from petoi import Skill
 from petoi.constants import ONLY_ON, RISKY
+from petoi.transports.base import STALE_SECONDS
+from test_constants import estimate_seconds
 
 TARGETS = [os.environ[k] for k in ("PETOI_PORT", "PETOI_BT", "PETOI_BLE", "PETOI_WS") if os.environ.get(k)]
 
@@ -32,7 +34,12 @@ def test_every_skill_completes(robot, skill):
         pytest.skip(f"{skill.value} is not on {robot.model}")
     if skill in RISKY and not os.environ.get("PETOI_RISKY"):
         pytest.skip("flips, falls and test postures; set PETOI_RISKY=1 with the robot on the floor")
+    robot.stand()  # same start posture for every timing
+    start = time.monotonic()
     robot.skill(skill)
+    elapsed = time.monotonic() - start
+    print(f"\n{skill.value}: {elapsed:.1f} s (estimate {estimate_seconds(model, skill.value):.1f} s)")
+    assert elapsed < STALE_SECONDS  # a later echo could be taken for a newer command's
 
 
 def test_melody_confirms_after_it_finishes(robot):

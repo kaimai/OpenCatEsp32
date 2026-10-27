@@ -68,7 +68,7 @@ with petoi.connect() as robot:  # finds a USB robot by itself
 | `petoi.connect("192.168.4.1")` | Wi-Fi, by IP address, `ws://...` URL, or `name.local` |
 | `petoi.connect("mock")` | The built-in fake robot |
 
-`connect(target, timeout=5.0, check_firmware=True)`: `timeout` is how many seconds each command may wait for the robot to confirm.
+`connect(target, timeout=5.0, check_firmware=True)`: `timeout` is how many seconds each command may wait for the robot to confirm. `skill()` waits up to `robot.skill_timeout` (30 s) instead, because a one-shot skill confirms only when it finishes. Raise it with `robot.skill_timeout = 60` or `robot.skill("name", timeout=60)`.
 
 Run `petoi ports` (see CLI below) to see what serial ports your computer has.
 
@@ -174,7 +174,7 @@ Exit codes: 0 means the robot confirmed the command, 1 means a failure or no rep
 
 ## Known limitations
 
-- The library cannot tell which reply belongs to which command, because the robot's protocol has no command IDs. Most commands are fine. But a one-shot skill (such as `Skill.PUSH_UP`) only replies when it finishes. If that reply arrives more than 15 seconds late, it could be mistaken for the reply to a newer command with the same first letter. We assume no built-in skill takes that long; this has not been checked on hardware.
+- The library cannot tell which reply belongs to which command, because the robot's protocol has no command IDs. Most commands are fine. But a one-shot skill (such as `Skill.PUSH_UP`) only replies when it finishes. If that reply arrives more than 15 seconds late, it could be mistaken for the reply to a newer command with the same first letter. By an estimate from the firmware's skill tables, the longest built-in skill (Nybble `hunt`) takes about 10 s. This has not been checked on hardware.
 - Some details were derived from the firmware source and have not been confirmed on a real robot yet: BLE long-command reassembly, the Wi-Fi idle heartbeat, the left/right order of the leg joints, and what each skill does.
 - The mock is a simplified robot, useful for trying code, not for judging timing or motion.
 

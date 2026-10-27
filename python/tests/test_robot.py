@@ -7,6 +7,7 @@ from conftest import FakeStream
 from petoi.constants import Joint, Skill
 from petoi.errors import RobotError, RobotTimeout
 from petoi.robot import Robot
+from petoi.transports.base import STALE_SECONDS
 
 
 def robot(replies=None, **kw):
@@ -265,3 +266,48 @@ def test_calibrate_gyro_raises_when_firmware_gives_up():
     ]})
     with pytest.raises(RobotError, match="calibration did not finish"):
         r.calibrate_gyro()
+
+
+def recorded_timeouts(r):
+    seen = []
+    command = r.transport.command
+    r.transport.command = lambda token, payload, timeout: seen.append(timeout) or command(token, payload, timeout)
+    return seen
+
+
+def test_skill_waits_skill_timeout_because_it_confirms_when_finished():
+    r = robot()
+    seen = recorded_timeouts(r)
+    r.skill(Skill.CLAP)
+    r.skill("anything")
+    assert seen == [r.skill_timeout, r.skill_timeout]
+
+
+def test_skill_timeout_can_be_overridden_per_call():
+    r = robot()
+    seen = recorded_timeouts(r)
+    r.skill("myLongSkill", timeout=60)
+    assert seen == [60]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [lambda r: r.sit(), lambda r: r.stand(), lambda r: r.stop(), lambda r: r.walk(),
+     lambda r: r.trot("left"), lambda r: r.crawl(), lambda r: r.back("right")],
+)
+def test_gaits_and_postures_keep_the_short_timeout(call):
+    r = robot()  # gaits echo when they start (src/reaction.h:1555-1565)
+    seen = recorded_timeouts(r)
+    call(r)
+    assert seen == [0.2]
+
+
+def test_skill_timeout_error_names_the_skill_limit():
+    r = Robot(FakeStream({}, auto_echo=False), timeout=0.2, skill_timeout=0.3)
+    with pytest.raises(RobotTimeout, match=r"within 0\.3s"):
+        r.skill("hi")
+
+
+def test_default_skill_timeout_fits_between_stale_window_and_wifi_abort():
+    # at least the 15 s stale window, below the Wi-Fi server's 45 s task abort (src/webServer.h:53)
+    assert STALE_SECONDS <= Robot(FakeStream()).skill_timeout < 45
