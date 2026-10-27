@@ -36,3 +36,79 @@ def test_boot_wait_stops_at_ready():
 def test_bad_port_name_raises_connection_failed():
     with pytest.raises(ConnectionFailed, match="could not open"):
         SerialTransport("/dev/does-not-exist-petoi", boot_timeout=0)
+
+
+def test_partial_line_is_held_until_complete():
+    port = serial.serial_for_url("loop://", timeout=0.1)
+    t = SerialTransport(port=port, boot_timeout=0)
+    port.write(b"0,\t-3")
+    assert t.readline(0.2) is None
+    port.write(b",\t45,\r\n")
+    assert t.readline(0.5) == "0,\t-3,\t45,"
+
+
+def test_discard_input_drops_buffered_partial_and_ready_lines():
+    port = serial.serial_for_url("loop://", timeout=0.1)
+    t = SerialTransport(port=port, boot_timeout=0)
+    port.write(b"a\r\nb\r\nc")
+    assert t.readline(0.5) == "a"
+    t.discard_input()
+    port.write(b"d\r\n")
+    assert t.readline(0.5) == "d"
+
+
+def test_boot_wait_keeps_waiting_through_a_silent_stretch(monkeypatch):
+    import threading
+    import time
+
+    import petoi.transports.serial as mod
+
+    monkeypatch.setattr(mod, "QUIET_SECONDS", 0.2)
+    port = serial.serial_for_url("loop://", timeout=0.1)
+    port.write(b"Init\r\n")
+    threading.Timer(0.5, lambda: port.write(b"Ready!\r\n")).start()
+    t = SerialTransport(port=port, boot_timeout=3.0)
+    assert "Ready!" in t.boot_log
+
+
+def test_boot_wait_warns_when_ready_never_arrives(monkeypatch):
+    port = serial.serial_for_url("loop://", timeout=0.1)
+    port.write(b"Init\r\n")
+    with pytest.warns(RuntimeWarning, match="calibration prompt"):
+        SerialTransport(port=port, boot_timeout=0.3)
+
+
+class BrokenPort:
+    def __init__(self):
+        self.closed = False
+        self.in_waiting = 0
+
+    def read(self, n):
+        raise serial.SerialException("device disconnected")
+
+    def write(self, data):
+        raise serial.SerialException("device disconnected")
+
+    def flush(self):
+        pass
+
+    def reset_input_buffer(self):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+def test_serial_errors_become_connection_failed():
+    t = SerialTransport(port=BrokenPort(), boot_timeout=0)
+    with pytest.raises(ConnectionFailed, match="lost connection"):
+        t.readline(0.1)
+    with pytest.raises(ConnectionFailed, match="lost connection"):
+        t.write(b"k\n")
+
+
+def test_port_is_closed_if_boot_wait_fails():
+    port = BrokenPort()
+    with pytest.raises(ConnectionFailed):
+        SerialTransport(port=port, boot_timeout=1.0)
+    assert port.closed

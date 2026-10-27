@@ -21,3 +21,29 @@ def test_zero_timeout_does_not_read():
     reply = s.command("k", b"kwkF\n", timeout=0)
     assert reply.completed is False
     assert s.pending == ["k"]
+
+
+def test_late_echo_of_unwaited_command_does_not_confirm_next_one():
+    s = FakeStream(auto_echo=False)
+    s.command("k", b"kwkF\n", timeout=0)  # nothing waits; its echo is still to come
+    s.replies[b"ksit\n"] = ["k"]  # that late echo arrives during the next command
+    reply = s.command("k", b"ksit\n", timeout=0.05)
+    assert reply.completed is False  # the only "k" was the stale one
+
+
+def test_second_echo_confirms_after_stale_one_is_consumed():
+    s = FakeStream(auto_echo=False)
+    s.command("k", b"kwkF\n", timeout=0)
+    s.replies[b"ksit\n"] = ["k", "k"]
+    assert s.command("k", b"ksit\n", timeout=0.05).completed
+    assert s.discards == 1  # only the first command discarded; stale echoes must be kept
+
+
+def test_expired_unconfirmed_entry_is_ignored(monkeypatch):
+    import petoi.transports.base as base
+
+    monkeypatch.setattr(base, "STALE_SECONDS", 0)
+    s = FakeStream(auto_echo=False)
+    s.command("k", b"kwkF\n", timeout=0)
+    s.command("k", b"ksit\n", timeout=0)  # first entry expired at once, so input is discarded again
+    assert s.discards == 2

@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from petoi.protocol import Reply, collect_reply
+
+
+STALE_SECONDS = 15.0  # longest one-shot skill we expect to take before it echoes
 
 
 class Transport(ABC):
     """A link to one robot."""
 
     @abstractmethod
-    def command(self, token: str, payload: bytes, timeout: Optional[float]) -> Reply:
-        """Send one encoded command; wait up to timeout seconds (0 = don't wait)."""
+    def command(self, token: str, payload: bytes, timeout: float) -> Reply:
+        """Send one encoded command and wait up to timeout seconds for its echo.
+
+        timeout=0 means do not wait: send and return an incomplete Reply."""
 
     @abstractmethod
     def close(self) -> None: ...
@@ -31,15 +36,43 @@ class StreamTransport(Transport):
     @abstractmethod
     def discard_input(self) -> None: ...
 
-    def command(self, token: str, payload: bytes, timeout: Optional[float]) -> Reply:
-        self.discard_input()  # so an old echo can't be mistaken for this one
+    @property
+    def _unconfirmed(self) -> List[Tuple[str, float]]:
+        # (token, expiry) of commands whose echo we haven't seen; lazy so
+        # subclasses needn't call super().__init__()
+        try:
+            return self.__unconfirmed
+        except AttributeError:
+            self.__unconfirmed: List[Tuple[str, float]] = []
+            return self.__unconfirmed
+
+    def command(self, token: str, payload: bytes, timeout: float) -> Reply:
+        # The protocol has no command IDs and one-shot skills echo only when
+        # finished, so a late echo from an earlier command can arrive now.
+        pending = self._unconfirmed
+        now = time.monotonic()
+        pending[:] = [(t, exp) for t, exp in pending if exp > now]
+        if not pending:
+            self.discard_input()  # nothing is owed, so anything buffered is junk
         self.write(payload)
+        entry = (token, time.monotonic() + STALE_SECONDS)
         if not timeout:
+            pending.append(entry)
             return Reply(token)
         deadline = time.monotonic() + timeout
 
         def next_line():
-            remaining = deadline - time.monotonic()
-            return self.readline(remaining) if remaining > 0 else None
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                line = self.readline(remaining)
+                if line is not None and pending and line.strip() == pending[0][0]:
+                    pending.pop(0)  # a late echo of an earlier command
+                    continue
+                return line
 
-        return collect_reply(token, next_line)
+        reply = collect_reply(token, next_line)
+        if not reply.completed:
+            pending.append(entry)
+        return reply
