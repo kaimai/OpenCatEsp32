@@ -5,7 +5,7 @@ import pytest
 
 from conftest import FakeStream
 from petoi.constants import Joint, Skill
-from petoi.errors import RobotTimeout
+from petoi.errors import RobotError, RobotTimeout
 from petoi.robot import Robot
 
 
@@ -230,3 +230,38 @@ def test_melody_waits_for_its_own_length():
 def test_every_public_method_has_a_docstring():
     public = [n for n in dir(Robot) if not n.startswith("_")]
     assert [n for n in public if callable(getattr(Robot, n)) and not getattr(Robot, n).__doc__] == []
+
+
+def test_gyro_state_parses_the_state_line():
+    # src/reaction.h:608-612 prints one line on USB; other output may come first
+    r = robot({b"g?\n": ["ypr 1 2 3", "Gyro state: Update-1 Balance-0 Print-0 Frequency-1", "g"]})
+    assert r.gyro_state() == {"update": True, "balance": False, "print": False, "fine": True}
+    assert r.transport.written[-1] == b"g?\n"
+
+
+def test_gyro_state_without_state_line_is_an_error():
+    r = robot({b"g?\n": ["g"]})  # e.g. over BLE: the line is USB-only (src/tools.h:6)
+    with pytest.raises(RobotError, match="gyro state"):
+        r.gyro_state()
+
+
+def test_calibrate_gyro_waits_for_calibration_done():
+    r = robot({b"gc\n": [
+        "Setting updateGyroQ to false...", "Calibrating...", "Calibration done.",
+        "Calibration completed, allowing IMU to stabilize...", "Creating IMU task...", "g",
+    ]})
+    seen = []
+    command = r.transport.command
+    r.transport.command = lambda token, payload, timeout: seen.append(timeout) or command(token, payload, timeout)
+    assert r.calibrate_gyro().completed
+    assert r.transport.written[-1] == b"gc\n"
+    assert seen == [pytest.approx(0.2 + 20)]
+
+
+def test_calibrate_gyro_raises_when_firmware_gives_up():
+    r = robot({b"gc\n": [
+        "Timeout waiting for calibration to complete. Forcing continuation.",
+        "Calibration completed, allowing IMU to stabilize...", "g",
+    ]})
+    with pytest.raises(RobotError, match="calibration did not finish"):
+        r.calibrate_gyro()

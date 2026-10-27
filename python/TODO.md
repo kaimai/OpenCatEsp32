@@ -16,9 +16,6 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   and long `b64:` payloads 30 s, and `b64:Q…` payloads or `B` melodies of over 10 values 120 s, which suggests some skills run longer than 5 s. Time every
   `Skill` on hardware. If any exceed 5 s, either raise the wait for skills only or estimate each skill's length
   from its frame count. Note the Wi-Fi server gives up on a task after 45 s (`src/webServer.h:53`).
-- [ ] **`Skill.SLEEP` name** (plan part D: `zz` is "all joints to 0", same pose as `zero`; proposes removing it). It maps to `zz`. The workshop's `level-3.py` calls `kzz` "all joint at 0 degrees",
-  and the firmware has a separate `zero` posture. I could not tell from the code what `zz` does. Watch it on a
-  robot and rename the member if needed.
 - [ ] **`back("right")` sends `kbkR`.** By reading `src/skill.h:55-58` it resolves by prefix and is mirrored (`:483`),
   the same path `walk("right")` uses. Not yet seen on a robot.
 - [ ] **Bittle with the robot arm.** The hardware test treats any non-Nybble model as plain Bittle, so it cannot
@@ -50,11 +47,10 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   timeout has not been looked up.
 - [ ] **Upload a custom skill** (plan part B) (`K` + int8 frames + `~`, or `b64:` over Wi-Fi), as the Desktop App tester's
   `send_K_skill_data` does. Pairs with Skill Composer exports.
-- [ ] **More `Skill` members** (plan part D). Names whose meaning I could not source are left out: `zero`, `ts`, `calib`, `lnd`,
-  `launch`, `pick*`, `put*`, `toss*`, `flip*`, `knock`, `lucky`, `dropRec`, `lu`, `lkPaws`, `headToss`. They
-  still work through `skill("name")`.
-- [ ] **Gyro extras** (plan part D): read the state (`g?`) and calibrate (`gc`, which turns the servos off and runs on the robot
-  for a while). Left out of `gyro(on)` on purpose.
+- [ ] **`flip`/`flipD`/`flipF` left out** (plan part D): they overlap `bf`/`ff` and are not in `randomMind.h:51`, so `RISKY` could not mark them.
+  They still work through `skill("name")`.
+- [ ] **Time `calibrate_gyro()`** on MPU6050 and ICM42670 boards; the firmware gives up after 10 s (`src/reaction.h:549`),
+  and then `calibrate_gyro()` would report failure even though calibration may finish later.
 
 ## Engineering follow-ups
 

@@ -98,13 +98,15 @@ After connecting, the library asks the robot for its model and firmware version.
 | `beep(note, duration)` | Play one note: `note` is semitones above C6 (0 is a rest); it lasts 1/`duration` of a second, so `beep(12, 8)` is 125 ms |
 | `melody([(12, 8), (14, 8), (16, 4)])` | Play several `(note, duration)` pairs; returns when the tune ends |
 | `gyro(on)` | Turn gyro balancing on or off (off before tricks it would fight) |
+| `gyro_state()` | `{"update", "balance", "print", "fine"}` flags as booleans; USB only (raises `RobotError` over Bluetooth/Wi-Fi) |
+| `calibrate_gyro()` | Calibrate and save the gyro (~20 s). The servos turn off: lay the robot flat and don't touch it. Raises `RobotError` if it didn't finish |
 | `info()` | `{"model": ..., "version": ...}` |
 
 `Joint` names: `HEAD_PAN`, `HEAD_TILT`, `TAIL`, `LEFT_FRONT_SHOULDER`, `RIGHT_FRONT_SHOULDER`, `RIGHT_BACK_SHOULDER`, `LEFT_BACK_SHOULDER`, `LEFT_FRONT_KNEE`, `RIGHT_FRONT_KNEE`, `RIGHT_BACK_KNEE`, `LEFT_BACK_KNEE`. You can also pass plain joint numbers.
 
-`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `BUTT_UP`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `SLEEP`, `HIGH_FIVE`, `HANDSHAKE`, `ANGRY`, `BOXING`, `CHEER`, `COME_HERE`, `DIG`, `GOOD_BOY`, `HANDSTAND`, `HUG`, `HANDS_UP`, `HUNT`, `KICK`, `NOD`, `PLAY_DEAD`, `RECOVER`, `TABLE`, `WAVE_HEAD`, `CLAP`, `JUMP`, `LEAP_OVER`, `MOONWALK`, `PUSH_UP_ONE_HAND`, `SHOW_OFF`, `BACK_FLIP`, `FRONT_FLIP`, `ROLL`, `WASH_FACE`.
+`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `BUTT_UP`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `HIGH_FIVE`, `HANDSHAKE`, `ANGRY`, `BOXING`, `CHEER`, `COME_HERE`, `DIG`, `GOOD_BOY`, `HANDSTAND`, `HUG`, `HANDS_UP`, `HUNT`, `KICK`, `NOD`, `PLAY_DEAD`, `RECOVER`, `TABLE`, `WAVE_HEAD`, `CLAP`, `JUMP`, `LEAP_OVER`, `MOONWALK`, `PUSH_UP_ONE_HAND`, `SHOW_OFF`, `BACK_FLIP`, `FRONT_FLIP`, `ROLL`, `WASH_FACE`, `ZERO`, `CALIBRATION_POSE`, `SERVO_TEST`, `LAND`, `DROP_RECOVER`, `KNOCK`, `LUCKY_CAT`, `LOOK_UP`, `LICK_PAWS`, `HEAD_TOSS`, `PICK_DOWN`, `PICK_FRONT`, `PUT_DOWN`, `PUT_FRONT`, `TOSS_FRONT`, `LAUNCH`.
 
-Not every robot has every skill. `petoi.constants.ONLY_ON` lists the exceptions: for example the flips and `ROLL` are on Bittle only (not Bittle with the robot arm), and `WASH_FACE` is on Nybble only. `petoi.constants.RISKY` lists the flips, falls and other violent moves; clear some floor space first. Robots have more skills than this list; reach them with `robot.skill("name")`.
+Not every robot has every skill. `petoi.constants.ONLY_ON` lists the exceptions: for example the flips and `ROLL` are on Bittle only (not Bittle with the robot arm), and `WASH_FACE` is on Nybble only. `petoi.constants.RISKY` lists flips, falls and test postures the firmware keeps out of random mode; clear some floor space first. `PICK_DOWN` ... `LAUNCH` are made for the robot arm. For a fixed side, use `robot.skill("pickL")` / `"pickR"` (also `put`, `toss`); a bare `"pick"` alternates sides. Robots have more skills than this list; reach them with `robot.skill("name")`.
 
 Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to any movement method (or to `send()`) to send the command and return at once without waiting.
 

@@ -35,6 +35,10 @@ class MockTransport(StreamTransport):
             self._out += [self.MODEL, self.VERSION]
         elif token == "j":
             self._out += ["=", "\t".join(map(str, range(len(self.angles)))), ",\t".join(map(str, self.angles)) + ","]
+        elif data == b"g?\n":
+            self._out.append("Gyro state: Update-1 Balance-1 Print-0 Frequency-1")  # src/reaction.h:608-612
+        elif data == b"gc\n":
+            self._out.append("Calibration done.")  # src/imu.h:1102
         self._out.append(token)
 
     def readline(self, timeout: float) -> Optional[str]:

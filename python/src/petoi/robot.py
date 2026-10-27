@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import threading
 from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
@@ -10,6 +11,8 @@ from petoi.transports.base import Transport
 
 Direction = Literal["forward", "left", "right"]
 _DIRECTIONS = {"forward": "F", "left": "L", "right": "R"}  # 'R' mirrors 'L' (src/skill.h:501)
+_GYRO_FLAGS = {"Update": "update", "Balance": "balance", "Print": "print", "Frequency": "fine"}  # src/reaction.h:609-612
+_CALIBRATE_SECONDS = 20  # 6 s of beeps, up to 10 s calibrating, 3 s settling (src/reaction.h:519-562)
 
 
 class Robot:
@@ -143,6 +146,24 @@ class Robot:
     def gyro(self, on: bool) -> Reply:
         """Turn gyro balancing on or off. Turn it off before tricks it would fight."""
         return self._cmd("g", "B" if on else "b")  # explicit; bare 'g' toggles (src/reaction.h:503-506)
+
+    def gyro_state(self) -> Dict[str, bool]:
+        """Read the gyro flags (USB only): update, balance, print, and fine (frequent sampling)."""
+        reply = self._cmd("g", "?")  # src/reaction.h:606-612
+        line = next((l for l in reply.lines if "Gyro state:" in l), None)
+        if line is None:
+            raise RobotError("no gyro state received; the robot prints it over USB only (src/tools.h:6)")
+        flags = dict(re.findall(r"(\w+)-([01])", line))
+        if not set(_GYRO_FLAGS) <= set(flags):
+            raise RobotError(f"unexpected gyro state: {line!r}")
+        return {key: flags[name] == "1" for name, key in _GYRO_FLAGS.items()}
+
+    def calibrate_gyro(self) -> Reply:
+        """Calibrate and save the gyro (about 20 s). Servos turn off; keep the robot flat and still."""
+        reply = self._cmd("g", "c", timeout=self.timeout + _CALIBRATE_SECONDS)  # src/reaction.h:511-563
+        if not any("Calibration done" in line for line in reply.lines):  # src/imu.h:1102
+            raise RobotError("gyro calibration did not finish; put the robot flat, keep it still and try again")
+        return reply
 
     def info(self) -> Dict[str, str]:
         """Return the robot's model and firmware version, e.g. {"model": "Bittle X", ...}."""

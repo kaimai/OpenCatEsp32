@@ -27,3 +27,9 @@ def test_mock_ignores_out_of_range_joints_like_the_firmware():
     r.joint(16, 10)  # must not raise
     r.joint(-1, 10)
     assert t.angles[15] == 0 and len(t.angles) == 16
+
+
+def test_mock_reports_gyro_state_and_calibrates():
+    r = Robot(MockTransport())
+    assert r.gyro_state() == {"update": True, "balance": True, "print": False, "fine": True}
+    assert r.calibrate_gyro().completed

@@ -28,9 +28,11 @@ def test_joint_indices_follow_firmware_groups():
 
 
 def test_skill_values_are_firmware_names():
-    # src/InstinctBittleESP.h:2486
+    # src/InstinctBittleESP.h:2486, src/InstinctNybbleESP.h:1451
     assert Skill.HIGH_FIVE.value == "fiv"
     assert Skill.STAND.value == "up"
+    assert Skill.ZERO.value == "zero" and Skill.LICK_PAWS.value == "lkPaws"
+    assert not hasattr(Skill, "SLEEP")  # zz is all joints to 0, not sleep (src/InstinctBittleESP.h:2481-2485)
 
 
 @needs_headers

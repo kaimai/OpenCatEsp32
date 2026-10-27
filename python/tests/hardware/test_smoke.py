@@ -31,7 +31,7 @@ def test_every_skill_completes(robot, skill):
     if model not in ONLY_ON.get(skill, {model}):
         pytest.skip(f"{skill.value} is not on {robot.model}")
     if skill in RISKY and not os.environ.get("PETOI_RISKY"):
-        pytest.skip("flips and falls; set PETOI_RISKY=1 with the robot on the floor")
+        pytest.skip("flips, falls and test postures; set PETOI_RISKY=1 with the robot on the floor")
     robot.skill(skill)
 
 
@@ -68,3 +68,10 @@ def test_gyro_off_then_on_confirms_and_next_command_is_clean(robot):
     robot.gyro(False)  # 'gb' prints 'g' twice; the second must not leak
     assert robot.info()["model"] == robot.model
     robot.gyro(True)
+
+
+def test_gyro_state_over_usb(robot, request):
+    if request.node.callspec.params["robot"] != os.environ.get("PETOI_PORT"):
+        pytest.skip("the gyro state line is printed to USB only (src/tools.h:6)")
+    robot.gyro(True)
+    assert robot.gyro_state()["balance"] is True

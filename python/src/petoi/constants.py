@@ -37,7 +37,6 @@ class Skill(str, Enum):
     PEE = "pee"
     SNIFF = "snf"
     SCRATCH = "scrh"
-    SLEEP = "zz"
     HIGH_FIVE = "fiv"
     HANDSHAKE = "hsk"
     ANGRY = "ang"
@@ -66,28 +65,56 @@ class Skill(str, Enum):
     FRONT_FLIP = "ff"
     ROLL = "rl"
     WASH_FACE = "wsf"
+    ZERO = "zero"
+    CALIBRATION_POSE = "calib"
+    SERVO_TEST = "ts"
+    LAND = "lnd"
+    DROP_RECOVER = "dropRec"
+    KNOCK = "knock"
+    LUCKY_CAT = "lucky"
+    LOOK_UP = "lu"
+    LICK_PAWS = "lkPaws"
+    HEAD_TOSS = "headToss"
+    PICK_DOWN = "pickD"   # PICK_DOWN..LAUNCH are for the robot arm
+    PICK_FRONT = "pickF"
+    PUT_DOWN = "putD"
+    PUT_FRONT = "putF"
+    TOSS_FRONT = "tossF"
+    LAUNCH = "launch"
 
 
 _BITTLE = {"bittle", "bittle_arm"}
 
 # Skills that only some instinct tables have; every other member is on all three.
 ONLY_ON = {
-    Skill.SLEEP: _BITTLE,
     Skill.CLAP: _BITTLE,
     Skill.JUMP: _BITTLE,
     Skill.LEAP_OVER: _BITTLE,
     Skill.MOONWALK: _BITTLE,
     Skill.PUSH_UP_ONE_HAND: _BITTLE,
     Skill.SHOW_OFF: _BITTLE,
+    Skill.LAND: _BITTLE,
+    Skill.PICK_DOWN: _BITTLE,
+    Skill.PICK_FRONT: _BITTLE,
+    Skill.PUT_DOWN: _BITTLE,
+    Skill.PUT_FRONT: _BITTLE,
+    Skill.TOSS_FRONT: _BITTLE,
+    Skill.LAUNCH: _BITTLE,
     Skill.BACK_FLIP: {"bittle"},
     Skill.FRONT_FLIP: {"bittle"},
     Skill.ROLL: {"bittle"},
+    Skill.KNOCK: {"bittle", "nybble"},
+    Skill.LUCKY_CAT: {"bittle", "nybble"},
     Skill.WASH_FACE: {"nybble"},
+    Skill.LOOK_UP: {"nybble"},
+    Skill.LICK_PAWS: {"nybble"},
+    Skill.HEAD_TOSS: {"nybble"},
 }
 
-# Flips, falls and other violent moves the firmware keeps out of random mode
+# Flips, falls, and test postures the firmware keeps out of random mode
 # (src/randomMind.h:51). Clear some space before running these.
 RISKY = {
-    Skill.SLEEP, Skill.ANGRY, Skill.PLAY_DEAD, Skill.RECOVER, Skill.JUMP,
-    Skill.LEAP_OVER, Skill.BACK_FLIP, Skill.FRONT_FLIP, Skill.ROLL,
+    Skill.ANGRY, Skill.PLAY_DEAD, Skill.RECOVER, Skill.JUMP, Skill.LEAP_OVER,
+    Skill.BACK_FLIP, Skill.FRONT_FLIP, Skill.ROLL,
+    Skill.ZERO, Skill.CALIBRATION_POSE, Skill.SERVO_TEST, Skill.LAND,
 }
