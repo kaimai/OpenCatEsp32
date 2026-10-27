@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.18"]
+requires = ["hatchling>=1.27"]  # 1.27 is the first to write PEP 639 License-Expression with Metadata-Version 2.4
 build-backend = "hatchling.build"
 
 [project]
@@ -9,7 +9,33 @@ description = "Control Petoi OpenCat robots (Bittle X, Nybble Q) from Python ove
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
+authors = [{ name = "Rongzhong Li" }, { name = "Kai Mai" }]
+keywords = ["petoi", "opencat", "bittle", "nybble", "quadruped", "robot", "robotics", "education", "esp32", "bluetooth", "ble", "websocket"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: System :: Hardware",
+    "Typing :: Typed",
+]
 dependencies = ["pyserial>=3.5"]
+
+[project.urls]
+Homepage = "https://www.petoi.com"
+Documentation = "https://docs.petoi.com"
+Source = "https://github.com/PetoiCamp/OpenCatEsp32-Quadruped-Robot"
+Issues = "https://github.com/PetoiCamp/OpenCatEsp32-Quadruped-Robot/issues"
 
 [project.optional-dependencies]
 ble = ["bleak>=0.22"]

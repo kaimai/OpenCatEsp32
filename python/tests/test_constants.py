@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 
@@ -7,6 +8,11 @@ from petoi.constants import ONLY_ON, RISKY, Skill, Joint
 
 SRC = Path(__file__).resolve().parents[2] / "src"
 TABLES = {"bittle": "InstinctBittleESP.h", "bittle_arm": "InstinctBittleESP_arm.h", "nybble": "InstinctNybbleESP.h"}
+# The firmware headers exist only in a repo checkout, not in an sdist. CI always has them, so never skip there.
+needs_headers = pytest.mark.skipif(
+    not all((SRC / h).is_file() for h in [*TABLES.values(), "randomMind.h"]) and not os.environ.get("CI"),
+    reason="needs the firmware headers in ../src (repo checkout only)",
+)
 
 
 def skill_names(header):
@@ -27,6 +33,7 @@ def test_skill_values_are_firmware_names():
     assert Skill.STAND.value == "up"
 
 
+@needs_headers
 @pytest.mark.parametrize("model", TABLES)
 def test_skills_exist_where_documented(model):
     names = skill_names(TABLES[model])
@@ -34,6 +41,7 @@ def test_skills_exist_where_documented(model):
     assert {s for s in Skill if s.value in names} == expected
 
 
+@needs_headers
 def test_risky_skills_are_the_ones_random_mode_forbids():
     line = next(l for l in (SRC / "randomMind.h").read_text().splitlines() if "forbiddenSkills[]" in l)
     forbidden = set(re.findall(r'"([^"]+)"', line))  # src/randomMind.h:51
