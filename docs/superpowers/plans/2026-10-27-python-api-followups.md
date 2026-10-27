@@ -1,6 +1,11 @@
 # Python API follow-ups: proposed plans
 
-> **Status: PROPOSED, not approved.** Do not implement until the owner approves each part.
+> **Status: APPROVED 2026-10-27 (parts A–E).** Owner decisions:
+> - D: remove `Skill.SLEEP`; include `calibrate_gyro()`.
+> - C: `skill_timeout` = 30 s for now; flagged in `python/TODO.md` for review after hardware timing.
+> - B: owner undecided on rejecting 126 vs clamping, and on Wi-Fi returning when a behavior starts. Implement as planned (reject; document the Wi-Fi limit) and keep both open in `python/TODO.md`.
+> - E: `[project.urls]` point at upstream `PetoiCamp/OpenCatEsp32-Quadruped-Robot`; `authors` = Rongzhong Li and Kai Mai (no emails). Remaining E questions take the plan's defaults: docs URL `https://docs.petoi.com`, "3 - Alpha", exact pins for mypy/types-pyserial, no oldest-bleak job, sdist contents unchanged, keep the `CI` override in test_constants.
+> - Order: E (without mypy) → D → C → B → A → E's mypy step.
 > Parent plan: `2026-10-27-python-api.md`. Source list: `python/TODO.md`.
 
 Five independent plans, drafted in parallel by read-only planning agents on 2026-10-27. The coordinator checked each plan's key firmware references against `src/`. Anything a plan marks UNVERIFIED still needs a real robot.
@@ -26,7 +31,7 @@ The parts don't depend on each other's design, but they touch the same files, so
 
 Suggested order: E (except the mypy step) → D → C → B → A → E's mypy step.
 
-## Owner questions (collected)
+## Owner questions (collected; answered above)
 
 - A: is a 60 s default for `setup_wifi` acceptable? Keep the "already on Wi-Fi: warn and return the IP" behavior?
 - B: accept that over Wi-Fi a behavior returns as it starts (firmware limit)? Accept rejecting 126 rather than clamping?

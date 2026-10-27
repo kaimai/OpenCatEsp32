@@ -33,6 +33,12 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
 - [ ] **Backup ref.** `refs/original/refs/heads/feature/python-api` is left from the commit-trailer rewrite.
   Delete it once the history is confirmed: `git update-ref -d refs/original/refs/heads/feature/python-api`.
 
+## Decisions to revisit
+
+- [ ] **`skill_timeout` default (30 s).** Chosen for now (plan part C). Revisit after timing every skill on hardware.
+- [ ] **Value 126 in uploaded skills.** `run_skill_data()` rejects it (plan part B); clamping to 125/127 was the alternative. Owner undecided.
+- [ ] **Uploaded behaviors over Wi-Fi return when they start**, because the firmware finishes the web task at the first `K` echo (`src/reaction.h:1565`). Owner undecided whether to accept this or ask for a firmware change.
+
 ## Feature candidates (each needs a plan amendment first)
 
 - [ ] **Wi-Fi setup from Python** (plan part A). Today a user needs another tool to put the robot on Wi-Fi before
