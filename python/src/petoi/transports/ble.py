@@ -37,7 +37,7 @@ class BleTransport(StreamTransport):
         self._connected = False
         self._closed = False
         try:
-            address = address or self._run(self._find(scan_timeout))
+            address = address or self._run(self._find(scan_timeout), limit=scan_timeout + RUN_TIMEOUT)
             self._client = bleak.BleakClient(address)
             self._run(self._client.connect())
             self._connected = True
@@ -66,13 +66,14 @@ class BleTransport(StreamTransport):
             self._connected = False
         self._shutdown_loop()
 
-    def _run(self, coro):
+    def _run(self, coro, limit: Optional[float] = None):
+        limit = RUN_TIMEOUT if limit is None else limit
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         try:
-            return future.result(timeout=RUN_TIMEOUT)
+            return future.result(timeout=limit)
         except concurrent.futures.TimeoutError:
             future.cancel()
-            raise ConnectionFailed(f"the BLE robot did not respond within {RUN_TIMEOUT:g}s") from None
+            raise ConnectionFailed(f"the BLE robot did not respond within {limit:g}s") from None
 
     async def _find(self, timeout: float) -> str:
         devices = await self._bleak.BleakScanner.discover(timeout=timeout)

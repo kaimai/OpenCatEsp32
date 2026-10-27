@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 from petoi.constants import Joint, Skill
 from petoi.errors import RobotError, RobotTimeout
@@ -50,58 +50,70 @@ class Robot:
         with self._lock:  # one command on the wire at a time
             return self.transport.command(token, payload, (self.timeout if timeout is None else timeout) if wait else 0)
 
-    def _cmd(self, token: str, *args, wait: bool = True) -> Reply:
+    def _cmd(self, token: str, *args, wait: bool = True, timeout: Optional[float] = None) -> Reply:
         payload = encode(token, *args)
-        reply = self._run(token, payload, wait, None)
+        reply = self._run(token, payload, wait, timeout)
         if wait and not reply.completed:
             shown = payload.decode(errors="replace").strip()
-            raise RobotTimeout(f"robot did not confirm {shown!r} within {self.timeout}s; check power and the connection")
+            limit = self.timeout if timeout is None else timeout
+            raise RobotTimeout(f"robot did not confirm {shown!r} within {limit:g}s; check power and the connection")
         return reply
 
     # --- postures and skills ----------------------------------------------
 
     def skill(self, name: Union[Skill, str], wait: bool = True) -> Reply:
+        """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes."""
         return self._cmd("k", name, wait=wait)
 
-    def sit(self) -> Reply:
-        return self.skill(Skill.SIT)
+    def sit(self, wait: bool = True) -> Reply:
+        """Sit down."""
+        return self.skill(Skill.SIT, wait)
 
-    def stand(self) -> Reply:
-        return self.skill(Skill.STAND)
+    def stand(self, wait: bool = True) -> Reply:
+        """Stand up."""
+        return self.skill(Skill.STAND, wait)
 
-    def stop(self) -> Reply:
+    def stop(self, wait: bool = True) -> Reply:
         """Stop walking and stand still."""
-        return self.skill(Skill.STAND)
+        return self.skill(Skill.STAND, wait)
 
-    def rest(self) -> Reply:
+    def rest(self, wait: bool = True) -> Reply:
         """Lie down and turn the servos off."""
-        return self._cmd("d")
+        return self._cmd("d", wait=wait)
 
     # --- gaits (keep going until stop()) ---------------------------------
 
-    def walk(self, direction: Direction = "forward") -> Reply:
-        return self.skill("wk" + _direction(direction))
+    def walk(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+        """Start walking forward, left or right until stop()."""
+        return self.skill("wk" + _direction(direction), wait)
 
-    def trot(self, direction: Direction = "forward") -> Reply:
-        return self.skill("tr" + _direction(direction))
+    def trot(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+        """Start trotting forward, left or right until stop()."""
+        return self.skill("tr" + _direction(direction), wait)
 
-    def crawl(self, direction: Direction = "forward") -> Reply:
-        return self.skill("cr" + _direction(direction))
+    def crawl(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+        """Start crawling forward, left or right until stop()."""
+        return self.skill("cr" + _direction(direction), wait)
 
-    def back(self) -> Reply:
-        return self.skill("bk")
+    def back(self, direction: Optional[Literal["left", "right"]] = None, wait: bool = True) -> Reply:
+        """Start walking backward, straight or turning left or right, until stop()."""
+        if direction not in (None, "left", "right"):
+            raise ValueError(f"direction must be left, right or None, got {direction!r}")
+        return self.skill("bk" + (_direction(direction) if direction else ""), wait)
 
     # --- joints -----------------------------------------------------------
 
-    def joint(self, index: Union[Joint, int], angle: int) -> Reply:
-        return self._cmd("i", index, angle)
+    def joint(self, index: Union[Joint, int], angle: float, wait: bool = True) -> Reply:
+        """Move one joint to an angle in degrees (rounded to a whole degree)."""
+        return self._cmd("i", index, _degrees(angle), wait=wait)
 
-    def move_joints(self, angles: Dict[Union[Joint, int], int], sequential: bool = False) -> Reply:
+    def move_joints(self, angles: Dict[Union[Joint, int], float], sequential: bool = False, wait: bool = True) -> Reply:
         """Move several joints together, or one after another if sequential."""
-        flat = [v for pair in angles.items() for v in pair]
-        return self._cmd("m" if sequential else "i", *flat)
+        flat = [v for index, angle in angles.items() for v in (index, _degrees(angle))]
+        return self._cmd("m" if sequential else "i", *flat, wait=wait)
 
     def joints(self) -> List[int]:
+        """Read every joint's current angle, indexed like Joint."""
         reply = self._cmd("j")
         if not reply.lines:
             raise RobotError("no joint angles received")
@@ -110,19 +122,37 @@ class Robot:
     # --- misc -------------------------------------------------------------
 
     def beep(self, note: int, duration: int) -> Reply:
+        """Play one note: semitones above C6 (0 is a rest), lasting 1/duration s (8 = 125 ms)."""
         return self._cmd("b", note, duration)
+
+    def melody(self, notes: Sequence[Tuple[int, int]], wait: bool = True) -> Reply:
+        """Play (note, duration) pairs as in beep(); waits until the tune ends."""
+        if not notes:
+            raise ValueError("melody needs at least one note; a bare 'b' toggles all sound")  # src/reaction.h:967
+        flat = []
+        for pair in notes:
+            if len(pair) != 2:
+                raise ValueError(f"each note must be (note, duration), got {pair!r}")
+            note, duration = pair
+            if duration < 1:
+                raise ValueError(f"duration must be at least 1, got {duration!r}")  # the firmware skips it (:1003)
+            flat += [note, duration]
+        length = sum(1 / d for _, d in notes)  # 1000/d ms per note (src/reaction.h:1004)
+        return self._cmd("b", *flat, wait=wait, timeout=self.timeout + length)
 
     def gyro(self, on: bool) -> Reply:
         """Turn gyro balancing on or off. Turn it off before tricks it would fight."""
         return self._cmd("g", "B" if on else "b")  # explicit; bare 'g' toggles (src/reaction.h:503-506)
 
     def info(self) -> Dict[str, str]:
+        """Return the robot's model and firmware version, e.g. {"model": "Bittle X", ...}."""
         reply = self._cmd("?")  # src/reaction.h:405-406
         if len(reply.lines) < 2:
             raise RobotError(f"unexpected reply to '?': {reply.lines}")
         return {"model": reply.lines[0], "version": reply.lines[1]}
 
     def close(self) -> None:
+        """Close the connection. The with-statement does this for you."""
         self.transport.close()
 
     def __enter__(self) -> "Robot":
@@ -144,3 +174,7 @@ def _direction(name: str) -> str:
         return _DIRECTIONS[name]
     except KeyError:
         raise ValueError(f"direction must be one of: {', '.join(_DIRECTIONS)}") from None
+
+
+def _degrees(angle: float) -> int:
+    return round(angle)  # the firmware's atoi would cut 30.7 to 30 (src/reaction.h:877)

@@ -88,22 +88,25 @@ After connecting, the library asks the robot for its model and firmware version.
 |---|---|
 | `sit()`, `stand()` | Posture |
 | `walk()`, `trot()`, `crawl()` | Gait, forward by default. `direction="left"` or `"right"`. Keeps going until `stop()` |
-| `back()` | Walk backward |
+| `back()` | Walk backward; `back("left")` or `back("right")` turns while backing up. Keeps going until `stop()` |
 | `stop()` | Stand still |
 | `rest()` | Lie down and turn the servos off |
 | `skill(Skill.HI)` | Run a built-in one-shot skill (a `Skill` or its short name such as `"hi"`) |
-| `joint(Joint.HEAD_PAN, 30)` | Move one joint to an angle in degrees |
+| `joint(Joint.HEAD_PAN, 30)` | Move one joint to an angle in degrees (decimals are rounded to the nearest degree) |
 | `move_joints({Joint.HEAD_PAN: 30, Joint.HEAD_TILT: 10})` | Move several joints together. `sequential=True` moves them one after another |
 | `joints()` | Current angle of every joint, as a list indexed by joint number |
-| `beep(note, duration)` | Play a note |
+| `beep(note, duration)` | Play one note: `note` is semitones above C6 (0 is a rest); it lasts 1/`duration` of a second, so `beep(12, 8)` is 125 ms |
+| `melody([(12, 8), (14, 8), (16, 4)])` | Play several `(note, duration)` pairs; returns when the tune ends |
 | `gyro(on)` | Turn gyro balancing on or off (off before tricks it would fight) |
 | `info()` | `{"model": ..., "version": ...}` |
 
 `Joint` names: `HEAD_PAN`, `HEAD_TILT`, `TAIL`, `LEFT_FRONT_SHOULDER`, `RIGHT_FRONT_SHOULDER`, `RIGHT_BACK_SHOULDER`, `LEFT_BACK_SHOULDER`, `LEFT_FRONT_KNEE`, `RIGHT_FRONT_KNEE`, `RIGHT_BACK_KNEE`, `LEFT_BACK_KNEE`. You can also pass plain joint numbers.
 
-`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `SLEEP`, `HIGH_FIVE`, `HANDSHAKE`. `Skill.SLEEP` (`zz`) exists only in the Bittle skill list; it is not in the Nybble list (`src/InstinctNybbleESP.h`), so other robots may not recognize it. Robots have more skills than this list; reach them with `robot.skill("name")`.
+`Skill` names: `SIT`, `STAND`, `BALANCE`, `STRETCH`, `BUTT_UP`, `HI`, `PUSH_UP`, `CHECK`, `PEE`, `SNIFF`, `SCRATCH`, `SLEEP`, `HIGH_FIVE`, `HANDSHAKE`, `ANGRY`, `BOXING`, `CHEER`, `COME_HERE`, `DIG`, `GOOD_BOY`, `HANDSTAND`, `HUG`, `HANDS_UP`, `HUNT`, `KICK`, `NOD`, `PLAY_DEAD`, `RECOVER`, `TABLE`, `WAVE_HEAD`, `CLAP`, `JUMP`, `LEAP_OVER`, `MOONWALK`, `PUSH_UP_ONE_HAND`, `SHOW_OFF`, `BACK_FLIP`, `FRONT_FLIP`, `ROLL`, `WASH_FACE`.
 
-Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to `skill()`, or use `send(..., wait=False)`, to not wait.
+Not every robot has every skill. `petoi.constants.ONLY_ON` lists the exceptions: for example the flips and `ROLL` are on Bittle only (not Bittle with the robot arm), and `WASH_FACE` is on Nybble only. `petoi.constants.RISKY` lists the flips, falls and other violent moves; clear some floor space first. Robots have more skills than this list; reach them with `robot.skill("name")`.
+
+Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to any movement method (or to `send()`) to send the command and return at once without waiting.
 
 ## Errors
 

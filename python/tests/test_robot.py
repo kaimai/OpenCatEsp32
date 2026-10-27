@@ -41,6 +41,11 @@ def test_raw_send_accepts_space_after_token():
         (lambda r: r.move_joints({8: 30, 9: -20}), b"i8 30 9 -20\n"),
         (lambda r: r.move_joints({0: 45}, sequential=True), b"m0 45\n"),
         (lambda r: r.beep(12, 8), b"b12 8\n"),
+        (lambda r: r.back("left"), b"kbkL\n"),
+        (lambda r: r.back("right"), b"kbkR\n"),
+        (lambda r: r.joint(0, 30.7), b"i0 31\n"),
+        (lambda r: r.move_joints({8: 29.6, 9: -20.4}), b"i8 30 9 -20\n"),
+        (lambda r: r.melody([(12, 8), (0, 4), (14, 8)]), b"b12 8 0 4 14 8\n"),
     ],
 )
 def test_high_level_commands(call, sent):
@@ -179,3 +184,49 @@ def test_gyro_off_double_echo_does_not_leak_into_next_reply():
     r = robot({b"gb\n": ["g", "g"], b"?\n": ["Bittle X", "B10_260820", "?"]})
     r.gyro(False)
     assert r.info() == {"model": "Bittle X", "version": "B10_260820"}
+
+
+def test_back_only_turns_left_or_right():
+    with pytest.raises(ValueError, match="left, right"):
+        robot().back("forward")
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda r: r.sit(wait=False),
+        lambda r: r.stand(wait=False),
+        lambda r: r.stop(wait=False),
+        lambda r: r.rest(wait=False),
+        lambda r: r.walk("left", wait=False),
+        lambda r: r.trot(wait=False),
+        lambda r: r.crawl(wait=False),
+        lambda r: r.back(wait=False),
+        lambda r: r.joint(8, 30, wait=False),
+        lambda r: r.move_joints({8: 30}, wait=False),
+        lambda r: r.melody([(12, 8)], wait=False),
+    ],
+)
+def test_wait_false_on_moves_neither_waits_nor_raises(call):
+    call(robot(auto_echo=False))
+
+
+@pytest.mark.parametrize("notes", [[], [(12, 0)], [(12,)], [(12, 8, 1)]])
+def test_melody_rejects_what_the_firmware_would_misread(notes):
+    # bare 'b' toggles all sound (src/reaction.h:967); duration 0 is skipped (:1003)
+    with pytest.raises(ValueError):
+        robot().melody(notes)
+
+
+def test_melody_waits_for_its_own_length():
+    r = robot()
+    seen = []
+    command = r.transport.command
+    r.transport.command = lambda token, payload, timeout: seen.append(timeout) or command(token, payload, timeout)
+    r.melody([(12, 1), (14, 4)])  # 1000/1 + 1000/4 ms (src/reaction.h:1004)
+    assert seen == [pytest.approx(0.2 + 1.25)]
+
+
+def test_every_public_method_has_a_docstring():
+    public = [n for n in dir(Robot) if not n.startswith("_")]
+    assert [n for n in public if callable(getattr(Robot, n)) and not getattr(Robot, n).__doc__] == []

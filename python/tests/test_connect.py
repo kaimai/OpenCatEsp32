@@ -101,3 +101,18 @@ def test_transport_is_closed_if_firmware_check_raises(monkeypatch):
 def test_bluetooth_without_match_explains_explicit_port_on_windows_and_linux():
     with pytest.raises(ConnectionFailed, match="rfcomm"):
         pick_serial_port([], bluetooth=True)
+
+
+def test_connect_timeout_is_also_the_ble_scan_time(monkeypatch):
+    import petoi.transports.ble as ble
+
+    seen = {}
+
+    def fake(address=None, scan_timeout=None):
+        seen.update(address=address, scan_timeout=scan_timeout)
+        raise ConnectionFailed("stop here")
+
+    monkeypatch.setattr(ble, "BleTransport", fake)
+    with pytest.raises(ConnectionFailed):
+        petoi.connect("ble", timeout=9)
+    assert seen == {"address": None, "scan_timeout": 9}

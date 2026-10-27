@@ -49,6 +49,7 @@ def pick_serial_port(ports, bluetooth: bool) -> str:
 
 
 def list_ports_info() -> List[str]:
+    """List serial ports as "device<TAB>description" lines, to find your robot."""
     return [f"{p.device}\t{p.description}" for p in list_ports.comports()]
 
 
@@ -61,7 +62,7 @@ def _open(kind: str, value: Optional[str], timeout: float):
         return WebSocketTransport(value, timeout=timeout)
     if kind == "ble":
         from petoi.transports.ble import BleTransport
-        return BleTransport(value)
+        return BleTransport(value, scan_timeout=timeout)
     from petoi.transports.serial import SerialTransport
     if value is None:
         value = pick_serial_port(list_ports.comports(), bluetooth=(kind == "bluetooth"))
@@ -85,7 +86,7 @@ def _check_firmware(robot: Robot) -> None:
 
 def connect(target: Optional[str] = None, timeout: float = 5.0, check_firmware: bool = True) -> Robot:
     """Connect to a robot. target: None (USB), a port name, "bluetooth", "ble",
-    "ble:<address>", a Wi-Fi address, or "mock"."""
+    "ble:<address>", a Wi-Fi address, or "mock". timeout is also the BLE scan time."""
     kind, value = classify(target)
     transport = _open(kind, value, timeout)
     try:

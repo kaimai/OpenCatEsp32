@@ -19,14 +19,18 @@ class Joint(IntEnum):
 
 
 class Skill(str, Enum):
-    """Built-in one-shot skills (names from src/InstinctBittleESP.h:2486).
+    """Built-in one-shot skills and postures. Any other name in the robot's skill
+    table still works through robot.skill("name").
 
-    All are also in src/InstinctNybbleESP.h except SLEEP ("zz"), which is Bittle-only."""
+    Names come from skillNameWithType in src/InstinctBittleESP.h,
+    src/InstinctBittleESP_arm.h and src/InstinctNybbleESP.h; ONLY_ON lists the
+    members that are missing from some of them."""
 
     SIT = "sit"
     STAND = "up"
     BALANCE = "balance"
     STRETCH = "str"
+    BUTT_UP = "buttUp"
     HI = "hi"
     PUSH_UP = "pu"
     CHECK = "ck"
@@ -36,3 +40,54 @@ class Skill(str, Enum):
     SLEEP = "zz"
     HIGH_FIVE = "fiv"
     HANDSHAKE = "hsk"
+    ANGRY = "ang"
+    BOXING = "bx"
+    CHEER = "chr"
+    COME_HERE = "cmh"
+    DIG = "dg"
+    GOOD_BOY = "gdb"
+    HANDSTAND = "hds"
+    HUG = "hg"
+    HANDS_UP = "hu"
+    HUNT = "hunt"
+    KICK = "kc"
+    NOD = "nd"
+    PLAY_DEAD = "pd"
+    RECOVER = "rc"
+    TABLE = "tbl"
+    WAVE_HEAD = "wh"
+    CLAP = "clap"
+    JUMP = "jmp"
+    LEAP_OVER = "lpov"
+    MOONWALK = "mw"
+    PUSH_UP_ONE_HAND = "pu1"
+    SHOW_OFF = "showOff"
+    BACK_FLIP = "bf"
+    FRONT_FLIP = "ff"
+    ROLL = "rl"
+    WASH_FACE = "wsf"
+
+
+_BITTLE = {"bittle", "bittle_arm"}
+
+# Skills that only some instinct tables have; every other member is on all three.
+ONLY_ON = {
+    Skill.SLEEP: _BITTLE,
+    Skill.CLAP: _BITTLE,
+    Skill.JUMP: _BITTLE,
+    Skill.LEAP_OVER: _BITTLE,
+    Skill.MOONWALK: _BITTLE,
+    Skill.PUSH_UP_ONE_HAND: _BITTLE,
+    Skill.SHOW_OFF: _BITTLE,
+    Skill.BACK_FLIP: {"bittle"},
+    Skill.FRONT_FLIP: {"bittle"},
+    Skill.ROLL: {"bittle"},
+    Skill.WASH_FACE: {"nybble"},
+}
+
+# Flips, falls and other violent moves the firmware keeps out of random mode
+# (src/randomMind.h:51). Clear some space before running these.
+RISKY = {
+    Skill.SLEEP, Skill.ANGRY, Skill.PLAY_DEAD, Skill.RECOVER, Skill.JUMP,
+    Skill.LEAP_OVER, Skill.BACK_FLIP, Skill.FRONT_FLIP, Skill.ROLL,
+}

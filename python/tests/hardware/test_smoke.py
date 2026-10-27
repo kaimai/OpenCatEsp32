@@ -6,6 +6,7 @@ import pytest
 import petoi
 import scenario
 from petoi import Skill
+from petoi.constants import ONLY_ON, RISKY
 
 TARGETS = [os.environ[k] for k in ("PETOI_PORT", "PETOI_BT", "PETOI_BLE", "PETOI_WS") if os.environ.get(k)]
 
@@ -26,7 +27,25 @@ def test_scenario(robot):
 
 @pytest.mark.parametrize("skill", list(Skill))
 def test_every_skill_completes(robot, skill):
+    model = "nybble" if "nybble" in (robot.model or "").lower() else "bittle"  # an arm build reports as Bittle
+    if model not in ONLY_ON.get(skill, {model}):
+        pytest.skip(f"{skill.value} is not on {robot.model}")
+    if skill in RISKY and not os.environ.get("PETOI_RISKY"):
+        pytest.skip("flips and falls; set PETOI_RISKY=1 with the robot on the floor")
     robot.skill(skill)
+
+
+def test_melody_confirms_after_it_finishes(robot):
+    start = time.monotonic()
+    robot.melody([(12, 4), (14, 4), (16, 2)])  # 250 + 250 + 500 ms
+    assert time.monotonic() - start >= 0.9
+
+
+@pytest.mark.parametrize("direction", ["left", "right"])
+def test_back_turning_completes(robot, direction):
+    robot.back(direction)  # bkR is resolved by prefix match and mirrored (src/skill.h:55-58, :483)
+    time.sleep(2)
+    robot.stop()
 
 
 def test_long_command_arrives_intact(robot):

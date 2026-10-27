@@ -45,3 +45,15 @@ def test_run_times_out_as_connection_failed(monkeypatch):
     with pytest.raises(ConnectionFailed, match="did not respond"):
         t._run(never())
     t.close()
+
+
+def test_run_limit_can_exceed_run_timeout(monkeypatch):
+    monkeypatch.setattr(ble, "RUN_TIMEOUT", 0.05)
+    t = make_transport()
+
+    async def scan():
+        await asyncio.sleep(0.15)
+        return "found"
+
+    assert t._run(scan(), limit=1) == "found"  # a long scan must not hit the per-operation limit
+    t.close()
