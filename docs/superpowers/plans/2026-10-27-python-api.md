@@ -1903,3 +1903,11 @@ Expected: all tests pass, coverage ≥ 85%, the last command prints `Mock Bittle
 - Skills: checked against both Instinct files; only `Skill.SLEEP` (`zz`) is Bittle-only and is documented as such.
 - README: runnable Errors snippet, "Quick start" heading, accurate wait wording, repo install first.
 - CI: `permissions: contents: read` and `-W error::DeprecationWarning` on the pytest step; CI still never publishes.
+
+### Amendment: gyro balancing (approved 2026-10-27)
+
+- `Robot.gyro(on: bool) -> Reply` sends `gB` (on) or `gb` (off). These set the state explicitly; bare `g` toggles and echoes `G` when turning on (`src/reaction.h:503-506`), which the exact-token echo match would report as unconfirmed.
+- Both forms leave the token as `g`, so the echo is `g` (`src/reaction.h:575-586`, `:1557`). `gb` prints `g` twice (`:579` and the echo); the extra line is dropped by `discard_input()` before the next command because nothing is owed.
+- Motivation: classroom scripts turn balancing off before tricks so the robot does not fight them (PetoiRobot `deacGyro()` sends `gb` on BiBoard; workshop `level-2.py`/`level-3.py` mark it "Do not remove this").
+- `GYRO_PIN` is defined for every build except `VT` (`src/OpenCat.h:94-96`); without it the command is accepted but does nothing (by reading, untested).
+- Test: `gyro(True)` writes `b"gB\n"`, `gyro(False)` writes `b"gb\n"`; a `gb` reply of `["g", "g"]` confirms and the following command still parses its own reply. Out of scope: `g?` state parsing, `gc` calibration (shuts servos, interactive).
