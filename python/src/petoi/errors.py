@@ -12,3 +12,7 @@ class RobotError(PetoiError):
 
 class RobotTimeout(RobotError):
     """The robot did not confirm a command in time."""
+
+
+class WifiSetupFailed(RobotError):
+    """The robot could not join the Wi-Fi network."""

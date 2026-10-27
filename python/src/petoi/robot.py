@@ -3,19 +3,26 @@ from __future__ import annotations
 import operator
 import re
 import threading
-from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
+import time
+import warnings
+from typing import Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 from petoi._timing import DOF, skill_seconds
 from petoi.constants import Joint, Skill
-from petoi.errors import RobotError, RobotTimeout
+from petoi.errors import RobotError, RobotTimeout, WifiSetupFailed
 from petoi.protocol import Reply, encode, parse_ints
 from petoi.transports.base import StreamTransport, Transport
+from petoi.transports.serial import READY
 
 Direction = Literal["forward", "left", "right"]
 _DIRECTIONS = {"forward": "F", "left": "L", "right": "R"}  # 'R' mirrors 'L' (src/skill.h:501)
 _GYRO_FLAGS = {"Update": "update", "Balance": "balance", "Print": "print", "Frequency": "fine"}  # src/reaction.h:609-612
 _CALIBRATE_SECONDS = 20  # 6 s of beeps, up to 10 s calibrating, 3 s settling (src/reaction.h:519-562)
 _SKILL_ROOM = 2507 - 1 - 20  # BUFF_LEN - 1 - CMD_LEN: leaves room for the next k command (src/OpenCat.h:438, :443; src/skill.h:131-137)
+_WIFI_JOINED = re.compile(r"Successfully connected Wifi to IP Address: (\S+)")  # src/reaction.h:465, src/webServer.h:622
+_WIFI_ALREADY = re.compile(r"Wifi already connected to IP Address: (\S+)")  # src/reaction.h:485
+_WIFI_FAILED = "Fail to connect Wifi!"  # USB only (src/reaction.h:477)
+_UNDEFINED = "Undefined token!"  # firmware built without WEB_SERVER (src/reaction.h:1535)
 
 
 class Robot:
@@ -202,6 +209,59 @@ class Robot:
             raise RobotError(f"unexpected reply to '?': {reply.lines}")
         return {"model": reply.lines[0], "version": reply.lines[1]}
 
+    # --- Wi-Fi ------------------------------------------------------------
+
+    def setup_wifi(self, ssid: str, password: str, timeout: float = 60.0) -> str:
+        """Over USB, put the robot on a 2.4 GHz Wi-Fi network and return its IP address for petoi.connect()."""
+        _check_wifi(ssid, password)
+        transport = self.transport
+        if not isinstance(transport, StreamTransport):
+            raise RobotError("setup_wifi() works over the USB cable; connect with petoi.connect() first")
+        payload = f"w%{ssid}%{password}\n".encode()  # src/reaction.h:442-446
+        deadline = time.monotonic() + timeout
+        ips: List[str] = []
+        already: Optional[str] = None
+        failed = False
+        with self._lock:
+            transport.discard_input()
+            transport._unconfirmed.clear()  # the robot reboots; nothing sent earlier will echo now
+            transport.write(payload)
+            # Never keep or show robot lines: they include the password's last 4 characters (src/reaction.h:449-458).
+            for line in _lines(transport, deadline):
+                joined, found = _WIFI_JOINED.search(line), _WIFI_ALREADY.search(line)
+                if joined:
+                    ips.append(joined.group(1))  # once before the reboot, again when it rejoins at boot
+                elif ips:
+                    if line == READY:
+                        if len(ips) > 1:
+                            return ips[-1]
+                        raise WifiSetupFailed(f"the robot joined {ssid!r} but could not rejoin after rebooting; try again")
+                elif found:
+                    already = found.group(1)
+                elif _WIFI_FAILED in line:
+                    failed = True
+                elif line == _UNDEFINED:
+                    raise RobotError("this robot's firmware has no Wi-Fi support; update it with the Petoi Desktop App")
+                elif line == "w":  # echoed only when it did not reboot (src/reaction.h:1557)
+                    if already:
+                        warnings.warn(
+                            f"the robot is already on Wi-Fi at {already}, so it ignored these details. To change "
+                            "networks, hold its BOOT button for about 3 seconds to clear the saved one, then try again.",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        return already
+                    if failed:
+                        raise WifiSetupFailed(
+                            f"could not join {ssid!r}: check the network name and password, and that it is 2.4 GHz Wi-Fi"
+                        )
+                    raise RobotError("the robot did not accept the Wi-Fi details")
+        if ips:
+            warnings.warn(f"the robot joined Wi-Fi but did not finish rebooting within {timeout:g}s",
+                          RuntimeWarning, stacklevel=2)
+            return ips[-1]
+        raise RobotTimeout(f"robot did not report a Wi-Fi result within {timeout:g}s; check power and the USB cable")
+
     def close(self) -> None:
         """Close the connection. The with-statement does this for you."""
         self.transport.close()
@@ -229,6 +289,28 @@ def _direction(name: str) -> str:
 
 def _degrees(angle: float) -> int:
     return round(angle)  # the firmware's atoi would cut 30.7 to 30 (src/reaction.h:877)
+
+
+def _check_wifi(ssid: str, password: str) -> None:
+    if not 1 <= len(ssid.encode()) <= 32:
+        raise ValueError("ssid must be 1 to 32 bytes long")  # WiFi.begin rejects others (arduino-esp32 WiFiSTA.cpp:231)
+    if "%" in ssid:
+        raise ValueError("ssid cannot contain '%': the firmware ends the name at it (src/reaction.h:442)")
+    if len(password.encode()) > 64:
+        raise ValueError("password is longer than 64 bytes")  # WiFiSTA.cpp:236; never echo the password
+    for name, value in (("ssid", ssid), ("password", password)):
+        if any(c in value for c in "\r\n\0"):
+            raise ValueError(f"{name} cannot contain a line break or NUL character")
+
+
+def _lines(transport: StreamTransport, deadline: float) -> Iterator[str]:
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        line = transport.readline(remaining)
+        if line is not None:
+            yield line.strip()
 
 
 def _check_skill_data(values: List[int], gait_widths: Tuple[int, ...]) -> None:

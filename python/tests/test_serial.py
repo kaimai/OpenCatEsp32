@@ -1,7 +1,10 @@
+import threading
+
 import pytest
 import serial
 
 from petoi.errors import ConnectionFailed
+from petoi.robot import Robot
 from petoi.transports.serial import SerialTransport
 
 
@@ -112,3 +115,16 @@ def test_port_is_closed_if_boot_wait_fails():
     with pytest.raises(ConnectionFailed):
         SerialTransport(port=port, boot_timeout=1.0)
     assert port.closed
+
+
+def test_setup_wifi_reads_through_the_reboot_over_loopback():
+    port = serial.serial_for_url("loop://", timeout=0.1)
+    robot = Robot(SerialTransport(port=port, boot_timeout=0))
+    ip = b"Successfully connected Wifi to IP Address: 192.168.1.23\r\n"
+    reboot = ip + b"Rebooting to use web server.\r\n\xff\x00ets Jun  8 2016\r\n" + ip + b"Ready!\r\n"
+    timer = threading.Timer(0.2, port.write, [reboot])  # after setup_wifi has discarded and written
+    timer.start()
+    try:
+        assert robot.setup_wifi("Home", "pw-12345", timeout=3) == "192.168.1.23"
+    finally:
+        timer.cancel()

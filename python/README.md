@@ -82,6 +82,30 @@ Opening a USB serial port usually resets the robot's board, so it reboots. `conn
 
 After connecting, the library asks the robot for its model and firmware version. If the firmware is older than `260820`, or does not answer, you get a `RuntimeWarning` suggesting an update with the Petoi Desktop App. Everything may still work. Pass `check_firmware=False` to skip the check (then `robot.model` and `robot.firmware` stay `None`).
 
+### Putting the robot on Wi-Fi
+
+Plug in the USB cable once, and the robot joins your Wi-Fi and tells you its address:
+
+```python
+import getpass
+
+import petoi
+
+with petoi.connect() as robot:  # over USB
+    ip = robot.setup_wifi("MyHomeWiFi", getpass.getpass("Wi-Fi password: "))
+print("robot is at", ip)
+
+with petoi.connect(ip) as robot:  # now over Wi-Fi; the cable can come out
+    robot.sit()
+```
+
+- It takes up to a minute: the robot tries the network up to 3 times, then reboots to start its Wi-Fi server. `setup_wifi()` returns once it is back.
+- The robot remembers the network and joins it every time it starts.
+- 2.4 GHz networks only. The name is 1 to 32 bytes and cannot contain `%`. The password is up to 64 characters; use `""` for an open network.
+- A wrong name or password raises `petoi.WifiSetupFailed`. Your password never appears in error messages (the robot's own serial monitor shows its last 4 characters).
+- If the robot is already on Wi-Fi it ignores the new details, and `setup_wifi()` returns its current address with a warning. To switch networks, hold the robot's BOOT button for about 3 seconds to clear the saved one, then run `setup_wifi()` again.
+- USB only: over Bluetooth the reboot drops the link.
+
 ## High-level methods
 
 | Method | What it does |
@@ -102,6 +126,7 @@ After connecting, the library asks the robot for its model and firmware version.
 | `gyro_state()` | `{"update", "balance", "print", "fine"}` flags as booleans; USB only (raises `RobotError` over Bluetooth/Wi-Fi) |
 | `calibrate_gyro()` | Calibrate and save the gyro (~20 s). The servos turn off: lay the robot flat and don't touch it. Raises `RobotError` if it didn't finish |
 | `info()` | `{"model": ..., "version": ...}` |
+| `setup_wifi(ssid, password)` | Over USB, put the robot on Wi-Fi; returns its IP address for `connect()` |
 
 `Joint` names: `HEAD_PAN`, `HEAD_TILT`, `TAIL`, `LEFT_FRONT_SHOULDER`, `RIGHT_FRONT_SHOULDER`, `RIGHT_BACK_SHOULDER`, `LEFT_BACK_SHOULDER`, `LEFT_FRONT_KNEE`, `RIGHT_FRONT_KNEE`, `RIGHT_BACK_KNEE`, `LEFT_BACK_KNEE`. You can also pass plain joint numbers.
 
@@ -152,7 +177,7 @@ if not reply.completed:
 
 `timeout=0` means "do not wait": `robot.send("kwkF", timeout=0)` returns at once with `completed=False`. That is expected, not a failure. Over Wi-Fi the firmware handles one command at a time, so Wi-Fi always waits for completion and `timeout=0` / `wait=False` do not skip the wait.
 
-All errors inherit from `petoi.PetoiError`; `RobotTimeout` is a `RobotError`; failing to open a link raises `petoi.ConnectionFailed`.
+All errors inherit from `petoi.PetoiError`; `RobotTimeout` is a `RobotError`; failing to open a link raises `petoi.ConnectionFailed`. `setup_wifi()` raises `petoi.WifiSetupFailed` (a `RobotError`) when the robot cannot join the network.
 
 ## Raw commands
 
@@ -186,7 +211,7 @@ Exit codes: 0 means the robot confirmed the command, 1 means a failure or no rep
 - **"could not open" / port busy**: another program (Petoi Desktop App, Arduino serial monitor) has the port. Close it.
 - **No USB port found, or several**: run `petoi ports` and pass the port name to `connect()`.
 - **BLE robot not found**: the robot may be connected to the phone app. Disconnect it there first.
-- **Wi-Fi**: the robot accepts at most 2 clients at once.
+- **Wi-Fi**: the robot accepts at most 2 clients at once. Not on Wi-Fi yet? See "Putting the robot on Wi-Fi".
 - **Firmware warning**: update the firmware with the Petoi Desktop App (see "Old firmware" above).
 - **Robot keeps moving after your script ended**: send `robot.stop()` or `robot.rest()`. The `with` block does this for you if an error ends the script.
 

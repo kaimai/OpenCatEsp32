@@ -16,6 +16,10 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
   `pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi. `test_largest_upload_arrives_intact`
   sends 2487 bytes in one unpaced write; if it fails on USB, add paced writes (the Desktop App tester sends 20-byte
   slices 1 ms apart). Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
+- [ ] **Wi-Fi setup (`setup_wifi`)** (plan part A):
+  `PETOI_PORT=/dev/cu.usbserial-XXXX PETOI_WIFI_SSID=... PETOI_WIFI_PASSWORD=... .venv/bin/python -m pytest tests/hardware/test_wifi_setup.py -v -s`.
+  Checks that the USB link survives `ESP.restart()`, the reboot time (60 s default assumed), and the BOOT-button reset
+  (the code implies about 2 s; the README says about 3 s). Record the measured reboot time here.
 - [ ] **`back("right")` sends `kbkR`.** By reading `src/skill.h:55-58` it resolves by prefix and is mirrored (`:483`),
   the same path `walk("right")` uses. Not yet seen on a robot.
 - [ ] **Bittle with the robot arm.** The hardware test treats any non-Nybble model as plain Bittle, so it cannot
@@ -38,13 +42,9 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
 
 ## Feature candidates (each needs a plan amendment first)
 
-- [ ] **Wi-Fi setup from Python** (plan part A). Today a user needs another tool to put the robot on Wi-Fi before
-  `connect("192.168.x.x")` works. The firmware takes `w%SSID%password` over serial, prints
-  `Successfully connected Wifi to IP Address: <ip>`, then reboots after 3 s (`src/reaction.h:436-475`).
-  If it is already on Wi-Fi it prints `Wifi already connected to IP Address: <ip>` (`:485`). A helper such as
-  `petoi.setup_wifi(ssid, password) -> ip` (over USB) would close the gap. Limits to handle: an SSID cannot
-  contain `%` (the first `%` after the SSID ends it), the reboot drops the serial link, and the Wi-Fi join's own
-  timeout has not been looked up.
+- [x] **Wi-Fi setup from Python**: done as `Robot.setup_wifi(ssid, password)` (plan part A).
+- [ ] **`petoi wifi` CLI** that asks for the password with `getpass` (follow-up to part A).
+- [ ] **`wifi_ip()`**: report the robot's current Wi-Fi address with a bare `w` (follow-up to part A).
 - [ ] **`flip`/`flipD`/`flipF` left out** (plan part D): they overlap `bf`/`ff` and are not in `randomMind.h:51`, so `RISKY` could not mark them.
   They still work through `skill("name")`.
 - [ ] **Time `calibrate_gyro()`** on MPU6050 and ICM42670 boards; the firmware gives up after 10 s (`src/reaction.h:549`),

@@ -6,10 +6,10 @@ import pytest
 from conftest import FakeStream
 from petoi._timing import skill_seconds
 from petoi.constants import Joint, Skill
-from petoi.errors import RobotError, RobotTimeout
+from petoi.errors import RobotError, RobotTimeout, WifiSetupFailed
 from petoi.protocol import encode
 from petoi.robot import Robot
-from petoi.transports.base import STALE_SECONDS
+from petoi.transports.base import STALE_SECONDS, Transport
 
 
 def robot(replies=None, **kw):
@@ -415,3 +415,136 @@ def test_posture_and_gait_uploads_keep_the_short_timeout():
     r.run_skill_data([2, 0, 0, 1] + [10] * 16)
     r.run_skill_data(POSTURE, timeout=3)
     assert seen == [0.2, 0.2, 3]
+
+
+PW = "s3cret-pw-9876"
+SENT = b"w%Home%" + PW.encode() + b"\n"
+INTRO = [  # src/reaction.h:440, :447, :458 (the robot shows the last 4 characters)
+    "The wifi info should start with 'w' and followed by ssid and password, separated by %.",
+    " e.g. w%WifiName%password",
+    "WifiSSID: \tHome",
+    "Password: \t**********9876",
+]
+JOINED = "Successfully connected Wifi to IP Address: 192.168.1.23"  # src/reaction.h:465, src/webServer.h:622
+
+
+def wifi_robot(lines):
+    return robot({SENT: INTRO + lines})
+
+
+def assert_secret_kept(error):
+    assert PW not in str(error) and "9876" not in str(error)
+
+
+def test_setup_wifi_returns_the_ip_after_the_reboot():
+    r = wifi_robot([JOINED, "Rebooting to use web server.", "ets Jun  8 2016 00:22:57", JOINED, "Ready!"])
+    assert r.setup_wifi("Home", PW) == "192.168.1.23"
+    assert r.transport.written == [SENT]
+
+
+def test_setup_wifi_prefers_the_address_from_after_the_reboot():
+    r = wifi_robot([JOINED, "Rebooting to use web server.",
+                    "Successfully connected Wifi to IP Address: 192.168.1.40", "Ready!"])
+    assert r.setup_wifi("Home", PW) == "192.168.1.40"
+
+
+def test_setup_wifi_wrong_password_raises_without_the_password():
+    r = wifi_robot([f"WiFi connection failed on attempt: \t{n}" for n in (1, 2, 3)]
+                   + ["All WiFi connection attempts failed", "Timeout: Fail to connect Wifi!", "w"])
+    with pytest.raises(WifiSetupFailed, match="'Home'") as e:
+        r.setup_wifi("Home", PW)
+    assert_secret_kept(e.value)
+
+
+def test_setup_wifi_raises_if_the_robot_cannot_rejoin_after_reboot():
+    r = wifi_robot([JOINED, "Rebooting to use web server.", "Timeout: Fail to connect web server!", "Ready!"])
+    with pytest.raises(WifiSetupFailed, match="rejoin") as e:
+        r.setup_wifi("Home", PW)
+    assert_secret_kept(e.value)
+
+
+def test_setup_wifi_returns_the_ip_with_a_warning_if_the_reboot_is_slow():
+    r = wifi_robot([JOINED, "Rebooting to use web server."])
+    with pytest.warns(RuntimeWarning, match="did not finish rebooting"):
+        assert r.setup_wifi("Home", PW, timeout=0.2) == "192.168.1.23"
+
+
+def test_setup_wifi_when_already_on_wifi_warns_and_returns_the_ip():
+    r = robot({SENT: ["Wifi already connected to IP Address: 10.0.0.7",  # src/reaction.h:485-488
+                      "Web server should already be running",
+                      "Press the BOOT key to reboot and use Wifi manager.",
+                      "Hold the BOOT key and count down 10 if you want to clear the previous Wifi credentials.",
+                      "w"]})
+    with pytest.warns(RuntimeWarning, match="already on Wi-Fi") as seen:
+        assert r.setup_wifi("Home", PW) == "10.0.0.7"
+    assert_secret_kept(seen[0].message)
+
+
+def test_setup_wifi_silence_raises_timeout_without_the_password():
+    r = robot(auto_echo=False)
+    with pytest.raises(RobotTimeout, match="Wi-Fi") as e:
+        r.setup_wifi("Home", PW, timeout=0.2)
+    assert_secret_kept(e.value)
+
+
+def test_setup_wifi_on_firmware_without_wifi_hides_the_echoed_command():
+    r = robot({SENT: ["Undefined token!", "%Home%" + PW, "w"]})  # src/reaction.h:1535-1536
+    with pytest.raises(RobotError, match="no Wi-Fi support") as e:
+        r.setup_wifi("Home", PW)
+    assert_secret_kept(e.value)
+
+
+def test_setup_wifi_bare_echo_means_not_accepted():
+    with pytest.raises(RobotError, match="did not accept"):
+        robot({SENT: INTRO[:2] + ["w"]}).setup_wifi("Home", PW)
+
+
+def test_setup_wifi_forgets_echoes_owed_from_before_the_reboot():
+    r = robot()
+    r.sit(wait=False)
+    assert r.transport._unconfirmed
+    r.transport.replies[SENT] = INTRO + [JOINED, JOINED, "Ready!"]
+    r.setup_wifi("Home", PW)
+    assert r.transport._unconfirmed == []
+
+
+@pytest.mark.parametrize("password", ["", "a%b c"])  # open network; '%' kept (src/reaction.h:446)
+def test_setup_wifi_sends_open_and_percent_passwords_unchanged(password):
+    name = "n" * 32
+    ip = "Successfully connected Wifi to IP Address: 10.0.0.9"
+    r = robot({f"w%{name}%{password}\n".encode(): [ip, ip, "Ready!"]})
+    assert r.setup_wifi(name, password) == "10.0.0.9"
+
+
+@pytest.mark.parametrize(
+    "ssid, password, match",
+    [
+        ("", PW, "1 to 32 bytes"),
+        ("x" * 33, PW, "1 to 32 bytes"),
+        ("\u00e9" * 17, PW, "1 to 32 bytes"),  # 34 UTF-8 bytes
+        ("my%net", PW, "%"),
+        ("Home\n", PW, "line break"),
+        ("Home", "p" * 65, "64 bytes"),
+        ("Home", PW + "\r", "line break"),
+        ("Home", PW + "\0", "line break"),
+    ],
+)
+def test_setup_wifi_rejects_what_the_firmware_would_misread(ssid, password, match):
+    r = robot()
+    with pytest.raises(ValueError, match=match) as e:
+        r.setup_wifi(ssid, password)
+    assert r.transport.written == []
+    assert password not in str(e.value) and PW not in str(e.value)
+
+
+class NotAStream(Transport):
+    def command(self, token, payload, timeout):
+        raise AssertionError("must not send")
+
+    def close(self):
+        pass
+
+
+def test_setup_wifi_needs_a_serial_link():
+    with pytest.raises(RobotError, match="USB"):
+        Robot(NotAStream()).setup_wifi("Home", PW)
