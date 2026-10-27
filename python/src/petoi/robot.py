@@ -37,6 +37,8 @@ class Robot:
             raise ValueError("command contains a newline; send one command per call")
         if "A" <= command[0] <= "Z":
             raise ValueError(f"{command[0]!r} is a binary command; use send_binary()")
+        if "\r" in body:
+            raise ValueError("command contains a carriage return; the firmware truncates at it (src/moduleManager.h:431)")
         payload = (command if command.endswith("\n") else command + "\n").encode()
         return self._run(command[0], payload, wait, timeout)
 

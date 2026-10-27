@@ -60,19 +60,28 @@ class StreamTransport(Transport):
             pending.append(entry)
             return Reply(token)
         deadline = time.monotonic() + timeout
+        consumed_own = False
 
         def next_line():
+            nonlocal consumed_own
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     return None
                 line = self.readline(remaining)
-                if line is not None and pending and line.strip() == pending[0][0]:
-                    pending.pop(0)  # a late echo of an earlier command
-                    continue
+                if line is not None:
+                    hit = next((i for i, (t, _) in enumerate(pending) if t == line.strip()), None)
+                    if hit is not None:
+                        # a late echo; earlier entries ahead of it were lost
+                        consumed_own = consumed_own or line.strip() == token
+                        del pending[: hit + 1]
+                        continue
                 return line
 
         reply = collect_reply(token, next_line)
         if not reply.completed:
-            pending.append(entry)
+            if consumed_own:
+                pending.clear()  # the echo we swallowed as stale was most likely our own
+            else:
+                pending.append(entry)
         return reply

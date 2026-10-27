@@ -47,3 +47,33 @@ def test_expired_unconfirmed_entry_is_ignored(monkeypatch):
     s.command("k", b"kwkF\n", timeout=0)
     s.command("k", b"ksit\n", timeout=0)  # first entry expired at once, so input is discarded again
     assert s.discards == 2
+
+
+def test_one_lost_echo_does_not_break_every_later_command():
+    s = FakeStream({b"ksit\n": []})  # robot never echoes this one
+    assert s.command("k", b"ksit\n", timeout=0.05).completed is False
+    s.replies.clear()
+    results = [s.command("k", p, timeout=0.05).completed for p in [b"ksit\n", b"kup\n"] * 3]
+    assert results.count(False) <= 1
+    assert results[1:] == [True] * 5
+
+
+def test_stale_echo_matching_a_later_pending_entry_does_not_confirm():
+    s = FakeStream(auto_echo=False)
+    s.command("i", b"i8 30\n", timeout=0)  # echo lost
+    s.command("k", b"kfiv\n", timeout=0)
+    s.replies[b"ksit\n"] = ["k"]  # fiv's late echo only
+    assert s.command("k", b"ksit\n", timeout=0.05).completed is False
+
+    s = FakeStream(auto_echo=False)
+    s.command("i", b"i8 30\n", timeout=0)
+    s.command("k", b"kfiv\n", timeout=0)
+    s.replies[b"ksit\n"] = ["k", "k"]
+    assert s.command("k", b"ksit\n", timeout=0.05).completed
+
+
+def test_genuine_late_echo_then_own_echo_completes():
+    s = FakeStream(auto_echo=False)
+    s.command("k", b"kfiv\n", timeout=0)
+    s.replies[b"ksit\n"] = ["k", "k"]
+    assert s.command("k", b"ksit\n", timeout=0.05).completed

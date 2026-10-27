@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import itertools
 import json
 import threading
@@ -30,7 +31,10 @@ class WebSocketTransport(Transport):
             raise ConnectionFailed('Wi-Fi needs an extra package: pip install "petoi[wifi]"') from None
         url = host if host.startswith("ws://") else f"ws://{host}:{port}"
         try:
-            self._ws = connect(url, open_timeout=timeout)
+            kwargs = {}
+            if "legacy" in inspect.signature(connect).parameters:
+                kwargs["legacy"] = True  # websockets >= 17.1 warns on a direct connect() otherwise
+            self._ws = connect(url, open_timeout=timeout, **kwargs)
             hello = json.loads(self._ws.recv(timeout))
         except Exception as e:
             raise ConnectionFailed(f"could not connect to {url}: {e}") from e

@@ -160,3 +160,8 @@ def test_failed_safe_stop_does_not_mask_the_users_exception():
         with r:
             raise KeyboardInterrupt
     assert r.transport.closed
+
+
+def test_send_rejects_bare_carriage_return():
+    with pytest.raises(ValueError, match="carriage return"):
+        robot().send("ksit\rkup")
