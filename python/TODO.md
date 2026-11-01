@@ -2,7 +2,7 @@
 
 Things still unresolved on `feature/python-api`. Each item says what is known, what is not, and where the evidence is.
 
-Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-10-27-python-api-followups.md`, parts A–E.
+Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md`, parts A–E (approved and implemented 2026-10-27; hardware checks still open below).
 
 ## Needs a real robot (merge gate)
 
