@@ -28,13 +28,13 @@ Proposed plans for most items (awaiting approval): `docs/superpowers/plans/2026-
 
 ## Needs the owner
 
-- [ ] **PyPI name.** The package is named `petoi` (`pyproject.toml`). Uploading needs the owner's PyPI account
+- [ ] **Publish to PyPI as `petoi`.** Name decided 2026-11-01 (`pyproject.toml`). Uploading needs the owner's PyPI account
   (consider a Petoi organization account). Decide between publishing 0.1.0 before hardware testing, or a 0.0.1
   placeholder to hold the name. Optionally also hold `opencat-robot`. Availability checked on 2026-10-27:
 
   | Name | Status |
   |---|---|
-  | `petoi` (current choice) | free |
+  | `petoi` (decided) | free |
   | `petoi-robot` (name inside Petoi's MindPlus `PetoiRobot` library) | free |
   | `opencat-robot` | free |
   | `petoi-opencat` | free |
