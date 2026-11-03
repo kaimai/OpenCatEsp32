@@ -135,3 +135,8 @@ def test_quaddle_skills_match_its_instinct_table():
                 if "skillNameWithType[]" in l)
     names = {n[:-1] for n in re.findall(r'"([^"]+)"', line)}
     assert {s for s in Skill if s.value in names} == QUADDLE_SKILLS
+
+
+def test_skill_seconds_uses_the_given_joint_count():
+    posture = [1, 0, 0, 1, *([10] * 6)]
+    assert skill_seconds(posture, [0] * 6, dof=6) == 0.088  # same 11 iterations of 8 ms as 16 joints

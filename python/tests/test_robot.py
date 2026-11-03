@@ -604,3 +604,40 @@ def test_setup_wifi_refuses_ble():
 
     with pytest.raises(RobotError, match="USB"):
         Robot(object.__new__(BleTransport)).setup_wifi("Home", PW)  # the reboot drops BLE; failures print to USB only
+
+
+def quaddle():
+    r = robot()
+    r.model = "Quaddle"
+    return r
+
+
+def test_quaddle_posture_has_six_angles():
+    quaddle().run_skill_data([1, 0, 0, 1, *([0] * 6)])
+    with pytest.raises(ValueError, match="needs 10 values"):
+        quaddle().run_skill_data([1, 0, 0, 1, *([0] * 16)])
+
+
+def test_quaddle_gait_rows_are_four_wide():
+    quaddle().run_skill_data([2, 0, 0, 1, *([10] * 8)])  # WALKING_DOF 4 (OpenCatEsp32S3 OpenCat.h:158)
+    with pytest.raises(ValueError, match="needs 12 values"):
+        quaddle().run_skill_data([2, 0, 0, 1, *([10] * 16)])
+
+
+def test_quaddle_behavior_rows_are_ten_wide():
+    data = [-1, 0, 0, 1, 0, 0, 0, *([0] * 6), 8, 0, 0, 0]  # 7-value header + one row of DOF + 4
+    r = Robot(FakeStream({encode("K", *data): ["K", "K"]}), timeout=0.2)  # echoes at start and end
+    r.model = "Quaddle"
+    assert r.run_skill_data(data).completed
+
+
+def test_quaddle_extended_behaviors_are_refused():
+    with pytest.raises(ValueError, match="over 127 frames"):
+        quaddle().run_skill_data([-128, 0, 0, 1])
+
+
+def test_skill_room_depends_on_the_model():
+    r = quaddle()
+    assert r._skill_layout() == (6, (4,), 4096 - 1 - 20)
+    r.model = "Bittle X"
+    assert r._skill_layout()[2] == 2507 - 1 - 20
