@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import queue
 import threading
+import time
 from typing import Any, Optional
 
 from petoi.errors import ConnectionFailed
@@ -16,6 +17,10 @@ ROBOT_TX = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  # robot notifies here
 NAME_MARK = "_BLE"  # src/bleUart.h:99
 CHUNK = 20  # default BLE payload size
 RUN_TIMEOUT = 15.0  # seconds any single BLE operation may take
+# What a robot sends when the link opens, measured by opencat-gemma (Bittle X and Quaddle, 2026-10-23)
+PUSH_WAIT = 2.0  # BiBoard pushes its greeting within this
+GREETING_TIMEOUT = 8.0  # then its forced rest ends with "d"
+QUERY_TIMEOUT = 5.0  # the reply to our '?'
 
 
 class BleTransport(StreamTransport):
@@ -36,6 +41,8 @@ class BleTransport(StreamTransport):
         self._chunk = CHUNK
         self._connected = False
         self._closed = False
+        self._raw: Optional[bytearray] = bytearray()
+        self._raw_lock = threading.Lock()
         try:
             address = address or self._run(self._find(scan_timeout), limit=scan_timeout + RUN_TIMEOUT)
             self._client = bleak.BleakClient(address)
@@ -43,6 +50,7 @@ class BleTransport(StreamTransport):
             self._connected = True
             self._run(self._client.start_notify(ROBOT_TX, self._on_notify))
             self._chunk = self._negotiated_chunk()
+            self._settle()
         except BaseException as e:  # incl. KeyboardInterrupt: clean up, then re-raise
             self._cleanup()
             if isinstance(e, Exception) and not isinstance(e, ConnectionFailed):
@@ -86,8 +94,43 @@ class BleTransport(StreamTransport):
         raise ConnectionFailed(f"several robots found, pass one address: {names}")
 
     def _on_notify(self, _char, data: bytearray) -> None:
+        with self._raw_lock:
+            if self._raw is not None:  # still connecting: _settle() reads the raw bytes
+                self._raw += data
+                return
         for line in self._buffer.feed(bytes(data)):
             self._lines.put(line)
+
+    def _raw_text(self) -> str:
+        with self._raw_lock:
+            return bytes(self._raw or b"").decode("utf-8", "replace")
+
+    def _wait_raw(self, done, timeout: float) -> bool:
+        end = time.monotonic() + timeout
+        while not done(self._raw_text()):
+            if time.monotonic() >= end:
+                return False
+            time.sleep(0.01)
+        return True
+
+    def _settle(self) -> None:
+        """Take in what each firmware sends when the link opens, so it isn't read as a command's reply.
+
+        BiBoard pushes "Petoi <MODEL>" and then rests, ending with "d" (src/bleUart.h:161-176). S3 firmware
+        pushes nothing, but answers the first '?' with "Petoi <MODEL>u<MODEL><version>?" and no line breaks
+        (OpenCatEsp32S3 petoiBleUartNimble.h:390-414). Asking '?' once here covers both (opencat-gemma ble.py)."""
+        if self._wait_raw(bool, PUSH_WAIT):
+            self._wait_raw(lambda text: "d" in _complete_lines(text), GREETING_TIMEOUT)  # no "d" seen: '?' still works
+        with self._raw_lock:
+            self._raw = bytearray()
+        self.write(b"?\n")
+        answered = self._wait_raw(
+            lambda text: "?" in _complete_lines(text) or ("Petoi" in text and text.strip().endswith("?")), QUERY_TIMEOUT)
+        if not answered:
+            raise ConnectionFailed(f"the BLE robot did not answer '?' within {QUERY_TIMEOUT:g}s")
+        with self._raw_lock:
+            self._raw = None
+        self.discard_input()
 
     def write(self, data: bytes) -> None:
         try:
@@ -120,3 +163,7 @@ class BleTransport(StreamTransport):
         self._thread.join(timeout=2)
         if not self._thread.is_alive():
             self._loop.close()
+
+
+def _complete_lines(text: str) -> list:
+    return [line.strip() for line in text.split("\n")[:-1]]
