@@ -21,6 +21,10 @@ _CALIBRATE_SECONDS = 20  # 6 s of beeps, up to 10 s calibrating, 3 s settling (s
 _SKILL_ROOM = 2507 - 1 - 20  # BUFF_LEN - 1 - CMD_LEN: leaves room for the next k command (src/OpenCat.h:438, :443; src/skill.h:131-137)
 _WIFI_JOINED = re.compile(r"Successfully connected Wifi to IP Address: (\S+)")  # src/reaction.h:465, src/webServer.h:622
 _WIFI_ALREADY = re.compile(r"Wifi already connected to IP Address: (\S+)")  # src/reaction.h:485
+_IPV4 = r"(\d{1,3}(?:\.\d{1,3}){3})"
+_WIFI_JOINED_S3 = re.compile(rf"IP Address: {_IPV4} successfully connected")  # S3 joins without rebooting (OpenCatEsp32S3 reaction.h:1259)
+_WIFI_ALREADY_S3 = re.compile(rf"IP Address: {_IPV4}\. Wifi already connected")  # OpenCatEsp32S3 reaction.h:1279
+_WIFI_FAILED_S3 = "Timeout: Fail to connect web server!"  # OpenCatEsp32S3 reaction.h:1270
 _WIFI_FAILED = "Fail to connect Wifi!"  # USB only (src/reaction.h:477)
 _UNDEFINED = "Undefined token!"  # firmware built without WEB_SERVER (src/reaction.h:1535)
 
@@ -219,7 +223,9 @@ class Robot:
     # --- Wi-Fi ------------------------------------------------------------
 
     def setup_wifi(self, ssid: str, password: str, timeout: float = 60.0) -> str:
-        """Over USB, put the robot on a 2.4 GHz Wi-Fi network and return its IP address for petoi.connect()."""
+        """Over USB, put the robot on a 2.4 GHz Wi-Fi network and return its IP address for petoi.connect().
+
+        OpenCatEsp32 reboots to start its Wi-Fi server; OpenCatEsp32S3 starts it without rebooting."""
         _check_wifi(ssid, password)
         transport = self.transport
         from petoi.transports.ble import BleTransport  # the reboot drops BLE, and failures print to USB only (src/reaction.h:477)
@@ -229,15 +235,17 @@ class Robot:
         payload = f"w%{ssid}%{password}\n".encode()  # src/reaction.h:442-446
         ips: List[str] = []
         already: Optional[str] = None
+        joined_now: Optional[str] = None
         failed = False
         with self._lock:
             transport.discard_input()
-            transport._unconfirmed.clear()  # the robot reboots; nothing sent earlier will echo now
+            transport._unconfirmed.clear()  # OpenCatEsp32 reboots; nothing sent earlier will echo now
             transport.write(payload)
             deadline = time.monotonic() + timeout  # counted from sending, not from waiting for the lock
             # Never keep or show robot lines: they include the password's last 4 characters (src/reaction.h:449-458).
             for line in _lines(transport, deadline):
-                joined, found = _WIFI_JOINED.search(line), _WIFI_ALREADY.search(line)
+                joined, found = _WIFI_JOINED.search(line), _WIFI_ALREADY.search(line) or _WIFI_ALREADY_S3.search(line)
+                s3_joined = _WIFI_JOINED_S3.search(line)
                 if joined:
                     ips.append(joined.group(1))  # once before the reboot, again when it rejoins at boot
                 elif ips:
@@ -245,16 +253,21 @@ class Robot:
                         if len(ips) > 1:
                             return ips[-1]
                         raise WifiSetupFailed(f"the robot joined {ssid!r} but could not rejoin after rebooting; try again")
+                elif s3_joined:
+                    joined_now = s3_joined.group(1)
                 elif found:
                     already = found.group(1)
-                elif _WIFI_FAILED in line:
+                elif _WIFI_FAILED in line or line == _WIFI_FAILED_S3:
                     failed = True
-                elif line == _UNDEFINED:
-                    for rest in _lines(transport, deadline):  # next line is the whole command, password included (:1536)
-                        if rest == "w":
-                            break
+                elif line.startswith(_UNDEFINED):
+                    if line == _UNDEFINED:  # OpenCatEsp32: next line is the whole command, password included (:1536)
+                        for rest in _lines(transport, deadline):
+                            if rest == "w":
+                                break
                     raise RobotError("this robot's firmware has no Wi-Fi support; update it with the Petoi Desktop App")
                 elif line == "w":  # echoed only when it did not reboot (src/reaction.h:1557)
+                    if joined_now:
+                        return joined_now
                     if already:
                         warnings.warn(
                             f"the robot is already on Wi-Fi at {already}, so it ignored these details. To change "

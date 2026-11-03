@@ -495,6 +495,37 @@ def test_setup_wifi_on_firmware_without_wifi_hides_the_echoed_command():
     assert r.transport.pending == []  # the echoed command (with the password) was read and dropped
 
 
+S3_JOINED = "IP Address: 192.168.1.130 successfully connected"  # OpenCatEsp32S3 reaction.h:1259-1260
+
+
+def test_setup_wifi_on_s3_returns_the_ip_without_a_reboot():
+    r = wifi_robot(["RSSI: -48 dBm", S3_JOINED, "WebSocket server is ready on port 81", "w"])
+    assert r.setup_wifi("Home", PW) == "192.168.1.130"
+
+
+def test_setup_wifi_on_s3_wrong_password_raises_without_the_password():
+    r = wifi_robot(["Timeout: Fail to connect web server!", "Saved WiFi slots:", "w"])
+    with pytest.raises(WifiSetupFailed, match="'Home'") as e:
+        r.setup_wifi("Home", PW)
+    assert_secret_kept(e.value)
+
+
+def test_setup_wifi_on_s3_when_already_on_wifi_warns_and_returns_the_ip():
+    r = robot({SENT: ["IP Address: 10.0.0.7. Wifi already connected", "RSSI: -50 dBm", "w"]})
+    with pytest.warns(RuntimeWarning, match="already on Wi-Fi"):
+        assert r.setup_wifi("Home", PW) == "10.0.0.7"
+
+
+def test_setup_wifi_on_s3_firmware_without_wifi_fails_fast_and_hides_the_command():
+    # S3 prints the whole command (password included) on one line, then echoes the PREVIOUS token (reaction.h:2621-2632)
+    r = robot({SENT: [f"Undefined token! token: w%Home%{PW} 37 72", "k"]})
+    start = time.monotonic()
+    with pytest.raises(RobotError, match="no Wi-Fi support") as e:
+        r.setup_wifi("Home", PW, timeout=5)
+    assert time.monotonic() - start < 1
+    assert_secret_kept(e.value)
+
+
 def test_setup_wifi_bare_echo_means_not_accepted():
     with pytest.raises(RobotError, match="did not accept"):
         robot({SENT: INTRO[:2] + ["w"]}).setup_wifi("Home", PW)
