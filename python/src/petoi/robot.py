@@ -74,7 +74,7 @@ class Robot:
         payload = encode(token, *values)
         if token in ("I", "M") and self.s3 and isinstance(self.transport, SerialTransport):
             with self._lock:  # OpenCatEsp32S3 reaction.h:2655-2657
-                self.transport.write(payload)
+                self.transport.write_command(payload)
             return Reply(token)
         return self._run(token, payload, wait, timeout)
 
@@ -262,7 +262,7 @@ class Robot:
         with self._lock:
             transport.discard_input()
             transport._unconfirmed.clear()  # OpenCatEsp32 reboots; nothing sent earlier will echo now
-            transport.write(payload)
+            transport.write_command(payload)
             deadline = time.monotonic() + timeout  # counted from sending, not from waiting for the lock
             # Never keep or show robot lines: they include the password's last 4 characters (src/reaction.h:449-458).
             for line in _lines(transport, deadline):

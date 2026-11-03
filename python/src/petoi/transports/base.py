@@ -46,6 +46,21 @@ class StreamTransport(Transport):
             self.__unconfirmed: List[Tuple[str, float]] = []
             return self.__unconfirmed
 
+    # Time to let the firmware read an unconfirmed command on its own before the next write:
+    # read_serial() takes every waiting byte, so two commands in its buffer become one
+    # (src/moduleManager.h:404-440). 50 ms covers an idle loop pass; unverified on hardware.
+    WRITE_GAP = 0.05
+    _owed_write_at = 0.0  # when the last unconfirmed command was written; 0 once confirmed
+
+    def write_command(self, payload: bytes) -> None:
+        """Write one command, first waiting out WRITE_GAP if the previous one is unconfirmed."""
+        if self._owed_write_at:
+            wait = self._owed_write_at + self.WRITE_GAP - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+        self.write(payload)
+        self._owed_write_at = time.monotonic()
+
     def command(self, token: str, payload: bytes, timeout: float) -> Reply:
         # The protocol has no command IDs and one-shot skills echo only when
         # finished, so a late echo from an earlier command can arrive now.
@@ -54,8 +69,11 @@ class StreamTransport(Transport):
         pending[:] = [(t, exp) for t, exp in pending if exp > now]
         if not pending:
             self.discard_input()  # nothing is owed, so anything buffered is junk
-        self.write(payload)
-        return self.expect(token, timeout)
+        self.write_command(payload)
+        reply = self.expect(token, timeout)
+        if reply.completed:
+            self._owed_write_at = 0.0  # its echo proves the firmware read it
+        return reply
 
     def expect(self, token: str, timeout: float) -> Reply:
         """Wait for one more echo of token without sending; timeout=0 only marks it as owed."""

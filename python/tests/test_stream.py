@@ -104,3 +104,39 @@ def test_owed_entry_expires_from_when_the_wait_ends(monkeypatch):
     s.readline = lambda timeout: time.sleep(timeout)  # the robot stays silent for the whole wait
     s.expect("k", timeout=0.15)  # longer than the stale window
     assert s._unconfirmed and s._unconfirmed[-1][1] > time.monotonic()
+
+
+def _record_sleeps(monkeypatch):
+    import petoi.transports.base as base
+
+    slept = []
+    monkeypatch.setattr(base.time, "sleep", slept.append)
+    return slept
+
+
+def test_command_right_after_an_unconfirmed_one_waits_out_the_gap(monkeypatch):
+    # read_serial() takes every waiting byte, so two commands in its buffer become one (src/moduleManager.h:404-440)
+    from petoi.transports.base import StreamTransport
+
+    slept = _record_sleeps(monkeypatch)
+    s = FakeStream(auto_echo=False)
+    s.command("k", b"kwkF\n", timeout=0)
+    s.command("k", b"kbalance\n", timeout=0)
+    assert len(slept) == 1 and 0 < slept[0] <= StreamTransport.WRITE_GAP
+    assert s.written == [b"kwkF\n", b"kbalance\n"]
+
+
+def test_confirmed_command_does_not_slow_the_next_one(monkeypatch):
+    slept = _record_sleeps(monkeypatch)
+    s = FakeStream()
+    assert s.command("k", b"ksit\n", timeout=1.0).completed
+    assert s.command("k", b"kup\n", timeout=1.0).completed
+    assert slept == []
+
+
+def test_write_command_paces_the_next_command(monkeypatch):
+    slept = _record_sleeps(monkeypatch)
+    s = FakeStream()
+    s.write_command(b"I\x08\xec~")  # never confirmed, e.g. S3 I over USB
+    s.command("k", b"ksit\n", timeout=1.0)
+    assert len(slept) == 1

@@ -662,3 +662,18 @@ def test_s3_binary_joint_moves_over_usb_do_not_wait_for_an_echo():
     assert time.monotonic() - start < 0.5 and not reply.completed
     assert r.transport._unconfirmed == []  # nothing is owed, so later commands aren't held up
     r.close()
+
+
+def test_s3_binary_joint_paces_the_following_command(monkeypatch):
+    import serial
+    import petoi.transports.base as base
+    from petoi.transports.serial import SerialTransport
+
+    slept = []
+    monkeypatch.setattr(base.time, "sleep", slept.append)
+    r = Robot(SerialTransport(serial.serial_for_url("loop://", timeout=0.05), boot_timeout=0), timeout=2)
+    r.firmware = "Q_261022"
+    r.send_binary("I", 2, 20)  # never confirmed over USB on S3 (reaction.h:2655-2657)
+    r.send_binary("I", 3, 20)
+    assert len(slept) == 1
+    r.close()
