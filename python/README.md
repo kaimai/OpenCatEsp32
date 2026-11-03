@@ -146,7 +146,7 @@ Quaddle has. Its other skills work with `robot.skill("name")`.
 
 Not every robot has every skill. `petoi.constants.ONLY_ON` lists the exceptions: for example the flips and `ROLL` are on Bittle only (not Bittle with the robot arm), and `WASH_FACE` is on Nybble only. `petoi.constants.RISKY` lists flips, falls and test postures the firmware keeps out of random mode; clear some floor space first. `PICK_DOWN` ... `LAUNCH` are made for the robot arm. For a fixed side, use `robot.skill("pickL")` / `"pickR"` (also `put`, `toss`); a bare `"pick"` alternates sides. Robots have more skills than this list; reach them with `robot.skill("name")`.
 
-Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to any movement method (or to `send()`) to send the command and return at once without waiting.
+Every method waits for the robot to confirm. Gaits (`walk()`, `trot()`, `crawl()`, `back()`) return once the gait has started and keep going until `stop()`; one-shot skills and postures return when they have finished. Pass `wait=False` to any movement method (or to `send()`) to send the command and return at once without waiting. A command sent within 50 ms of an unconfirmed one waits out the rest of that gap, so the robot reads the two separately; while the robot is busy (a melody, a frame transition), commands sent in a burst can still run together, so use `wait=True` when the order matters.
 
 ## Custom skills
 

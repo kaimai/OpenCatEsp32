@@ -26,10 +26,13 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   lacks) only if `?` reports a model containing "arm"; otherwise it treats the robot as plain Bittle. Find out what
   `?` reports on an arm build.
 - [ ] **Quaddle (S3 firmware)**: run `tests/hardware/test_s3.py` and `test_smoke.py` over USB, BLE and Wi-Fi
-  (`-s`, since `test_s3.py` asks you what you saw). Check: the `?` retry on a sleeping robot, the BLE handshake, `z0`
+  (`-s`, since `test_s3.py` asks you what you saw; the upload tests turn the front-left leg on Quaddle, which hasn't been tried). Check: the `?` retry on a sleeping robot, the BLE handshake, `z0`
   keeping it still, leg order, that Scout's extra joint is the head pan at index 0 (`PETOI_SCOUT=1`; assumed from
   PetoiWebCoding and the firmware's HEADPAN define), skill timings (the estimator is unverified for 6 joints), and
   `setup_wifi()` without a reboot.
+- [ ] **`WRITE_GAP` (50 ms, Part G)**: run `pytest tests/hardware -k stop_right_after -s` on USB and Bluetooth. If the robot keeps walking,
+  the gap is too short. Also try `wait=False` bursts during a melody, which pacing can't fix (the firmware isn't reading then:
+  `OpenCatEsp32.ino:86-89`).
 - [ ] **BLE connect on Bittle X after Part F**: connect now always asks `?` and waits for the forced rest. opencat-gemma
   made the same change, but it wasn't checked on a Bittle X there either.
 
@@ -88,6 +91,9 @@ Items 1–4 below: plan part E.
   Before Part F, a BiBoard that didn't answer `?` still connected with a warning. Ported as-is from opencat-gemma.
 - [ ] **`?` retry doubles the wait before the old-firmware warning** (Part F review): a robot that never answers takes
   2 × `timeout` (10 s by default). The retry is there for a sleeping Quaddle, which can't be told apart beforehand.
-- [ ] **Wi-Fi busy retry, unverified edge case** (Part F review): each attempt has its own deadline (up to 2 × timeout).
-  If the aborted task was a deferred one that finishes after the retry starts, `finishWebCommand()` might complete
-  the retry with the old command's results (`src/webServer.h:498-527`). Check on hardware: `walk()` then `stop()`.
+- [ ] **Wi-Fi busy retry** (Part F review, narrowed in Part G): only `"Previous web task is still running"` triggers the
+  retry; other errors for earlier tasks (e.g. `"Task timeout"`) are dropped. Each attempt has its own deadline (up to
+  2 × timeout). Still unverified: a deferred task that finishes after the retry starts might complete the retry with the
+  old command's results (`src/webServer.h:498-527`). Check on hardware: `walk()` then `stop()`.
+- [x] **Codex review fixes** (Part G, 2026-11-03): serial write pacing, the Wi-Fi retry limited to overlap errors,
+  `G`/`Z`/`P`/`k` echoes, and Quaddle-aware smoke tests.
