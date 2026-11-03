@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from petoi.protocol import Reply, collect_reply
+from petoi.protocol import Reply, collect_reply, echoes
 
 
 STALE_SECONDS = 15.0  # longest one-shot skill we expect to take before it echoes
@@ -92,10 +92,10 @@ class StreamTransport(Transport):
                     return None
                 line = self.readline(remaining)
                 if line is not None:
-                    hit = next((i for i, (t, _) in enumerate(pending) if t == line.strip()), None)
+                    hit = next((i for i, (t, _) in enumerate(pending) if line.strip() in echoes(t)), None)
                     if hit is not None:
                         # a late echo; earlier entries ahead of it were lost
-                        consumed_own = consumed_own or line.strip() == token
+                        consumed_own = consumed_own or line.strip() in echoes(token)
                         del pending[: hit + 1]
                         continue
                 return line

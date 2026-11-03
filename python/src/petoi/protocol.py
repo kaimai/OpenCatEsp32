@@ -10,7 +10,7 @@ import operator
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, List, Union
+from typing import Any, List, Tuple, Union
 
 BINARY_TERMINATOR = b"~"
 _TILDE = 126
@@ -74,6 +74,15 @@ class Reply:
         return "\n".join(self.lines)
 
 
+# Tokens the firmware rewrites before echoing (src/reaction.h:498, :506, :573, :627-629, echoed at :1557)
+_ECHOES = {"g": ("g", "G"), "z": ("z", "Z"), "p": ("P", "k")}
+
+
+def echoes(token: str) -> Tuple[str, ...]:
+    """Every line that confirms a command sent with this token."""
+    return _ECHOES.get(token, (token,))
+
+
 def collect_reply(token: str, next_line) -> Reply:
     """Read lines from next_line() until the token echo or None (timeout)."""
     lines: List[str] = []
@@ -82,7 +91,7 @@ def collect_reply(token: str, next_line) -> Reply:
         if line is None:
             return Reply(token, lines, completed=False)
         line = line.strip()
-        if line == token:
+        if line in echoes(token):
             return Reply(token, lines, completed=True)
         if line and line != _DATA_MARKER:
             lines.append(line)

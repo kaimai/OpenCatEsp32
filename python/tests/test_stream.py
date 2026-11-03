@@ -140,3 +140,11 @@ def test_write_command_paces_the_next_command(monkeypatch):
     s.write_command(b"I\x08\xec~")  # never confirmed, e.g. S3 I over USB
     s.command("k", b"ksit\n", timeout=1.0)
     assert len(slept) == 1
+
+
+def test_late_rewritten_echo_is_recognized_as_stale():
+    s = FakeStream(auto_echo=False)
+    s.command("g", b"g\n", timeout=0)  # toggles balance; echoes G or g later
+    s.replies[b"ksit\n"] = ["G", "k"]
+    reply = s.command("k", b"ksit\n", timeout=0.05)
+    assert reply.completed and reply.lines == []

@@ -118,3 +118,15 @@ def test_xrw_binary_tokens_reject_bytes_the_firmware_strips(token):
 
 def test_other_binary_tokens_allow_newline_bytes():
     assert encode("I", 10, 13) == b"I\x0a\x0d~"
+
+
+@pytest.mark.parametrize("token,echo", [("g", "G"), ("g", "g"), ("z", "Z"), ("p", "P"), ("p", "k")])
+def test_rewritten_echo_completes(token, echo):
+    # src/reaction.h:498, :506, :573, :627-629 rewrite the token before echoing it (:1557)
+    lines = iter(["=", echo])
+    assert collect_reply(token, lambda: next(lines, None)).completed
+
+
+def test_other_tokens_still_need_their_exact_echo():
+    lines = iter(["K"])
+    assert collect_reply("k", lambda: next(lines, None)).completed is False

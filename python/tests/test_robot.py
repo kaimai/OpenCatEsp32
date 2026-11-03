@@ -677,3 +677,8 @@ def test_s3_binary_joint_paces_the_following_command(monkeypatch):
     r.send_binary("I", 3, 20)
     assert len(slept) == 1
     r.close()
+
+
+def test_send_g_completes_when_balance_turns_on():
+    r = Robot(FakeStream({b"g\n": ["G"]}))
+    assert r.send("g").completed
