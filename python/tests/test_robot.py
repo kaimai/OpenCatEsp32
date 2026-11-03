@@ -641,3 +641,16 @@ def test_skill_room_depends_on_the_model():
     assert r._skill_layout() == (6, (4,), 4096 - 1 - 20)
     r.model = "Bittle X"
     assert r._skill_layout()[2] == 2507 - 1 - 20
+
+
+def test_s3_binary_joint_moves_over_usb_do_not_wait_for_an_echo():
+    import serial
+    from petoi.transports.serial import SerialTransport
+
+    r = Robot(SerialTransport(serial.serial_for_url("loop://", timeout=0.05), boot_timeout=0), timeout=2)
+    r.firmware = "Q_261022"
+    start = time.monotonic()
+    reply = r.send_binary("I", 0, 30)  # S3 sends the I/M echo to BLE and Wi-Fi only (reaction.h:2655-2657)
+    assert time.monotonic() - start < 0.5 and not reply.completed
+    assert r.transport._unconfirmed == []  # nothing is owed, so later commands aren't held up
+    r.close()

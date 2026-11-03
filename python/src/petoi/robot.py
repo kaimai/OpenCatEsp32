@@ -12,7 +12,7 @@ from petoi.constants import Joint, Skill, is_s3_firmware, model_key
 from petoi.errors import RobotError, RobotTimeout, WifiSetupFailed
 from petoi.protocol import Reply, encode, parse_ints
 from petoi.transports.base import StreamTransport, Transport
-from petoi.transports.serial import READY
+from petoi.transports.serial import READY, SerialTransport
 
 Direction = Literal["forward", "left", "right"]
 _DIRECTIONS = {"forward": "F", "left": "L", "right": "R"}  # 'R' mirrors 'L' (src/skill.h:501)
@@ -67,8 +67,15 @@ class Robot:
         return self._run(command[0], payload, wait, timeout)
 
     def send_binary(self, token: str, *values: int, wait: bool = True, timeout: Optional[float] = None) -> Reply:
-        """Send an uppercase (binary) command, e.g. send_binary("I", 8, -20)."""
-        return self._run(token, encode(token, *values), wait, timeout)
+        """Send an uppercase (binary) command, e.g. send_binary("I", 8, -20).
+
+        On S3 firmware over USB, I and M are never confirmed: the robot sends that echo to BLE and Wi-Fi only."""
+        payload = encode(token, *values)
+        if token in ("I", "M") and self.s3 and isinstance(self.transport, SerialTransport):
+            with self._lock:  # OpenCatEsp32S3 reaction.h:2655-2657
+                self.transport.write(payload)
+            return Reply(token)
+        return self._run(token, payload, wait, timeout)
 
     def _run(self, token: str, payload: bytes, wait: bool, timeout: Optional[float]) -> Reply:
         with self._lock:  # one command on the wire at a time
