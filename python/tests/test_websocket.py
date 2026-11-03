@@ -14,6 +14,7 @@ received = []
 def firmware(ws):
     ws.send(json.dumps({"type": "connected", "clientId": "0"}))
     running = None  # the task the fake is "executing" forever
+    timed_out = None  # a task whose firmware-side timeout fires before the next command
     for raw in ws:
         msg = json.loads(raw)
         if msg["type"] != "command":
@@ -24,6 +25,14 @@ def firmware(ws):
             running = task
             ws.send(json.dumps({"type": "response", "taskId": task, "status": "running"}))
             continue
+        if msg["commands"] == ["late"]:
+            timed_out = task
+            ws.send(json.dumps({"type": "response", "taskId": task, "status": "running"}))
+            continue
+        if timed_out:
+            # WEB_TASK_EXECUTION_TIMEOUT fired for it before this command (src/webServer.h:720-726)
+            ws.send(json.dumps({"taskId": timed_out, "status": "error", "error": "Task timeout"}))
+            timed_out = None
         if running and msg["commands"] == ["bad"]:
             # Real firmware: errorWebTask() reports the RUNNING task's id and aborts it;
             # the new task is never stored (src/webServer.h:346-347, :487-512)
@@ -70,6 +79,14 @@ def test_busy_robot_aborts_the_old_task_and_runs_the_retry(port):
     reply = t.command("b", b"bad\n", timeout=2.0)  # rejected once, which aborts "slow"; the retry runs
     assert reply.completed
     assert [m["commands"] for m in received] == [["slow"], ["bad"], ["bad"]]
+    t.close()
+
+
+def test_old_task_timeout_does_not_resend_the_next_command(port):
+    t = WebSocketTransport("127.0.0.1", port=port, heartbeat=False)
+    assert t.command("l", b"late\n", timeout=0.2).completed is False
+    assert t.command("k", b"khi\n", timeout=2.0).completed
+    assert [m["commands"] for m in received] == [["late"], ["khi"]]  # not sent twice
     t.close()
 
 

@@ -33,6 +33,9 @@ class _Busy(RobotError):
     """The robot rejected our task because an earlier one was running; that rejection also aborted it."""
 
 
+_OVERLAP = "Previous web task is still running"  # the only error that means ours was refused (src/webServer.h:347)
+
+
 class WebSocketTransport(Transport):
     """Wi-Fi link to the robot's WebSocket server.
 
@@ -136,9 +139,11 @@ class WebSocketTransport(Transport):
                 raise ConnectionFailed("lost Wi-Fi connection; reconnect with petoi.connect()")
             tid, status = msg.get("taskId"), msg.get("status")
             if status == "error" and tid in previous:
+                self._outstanding.remove(tid)
+                if msg.get("error") != _OVERLAP:
+                    continue  # an earlier task failed on its own, e.g. "Task timeout" (src/webServer.h:720-726)
                 # The firmware reports a rejected overlap with the RUNNING task's id
                 # and aborts that task; ours was never stored (src/webServer.h:346-347, :487-512).
-                self._outstanding.remove(tid)
                 self._outstanding.remove(task_id)
                 raise _Busy()
             if status == "completed" and tid in self._outstanding:
