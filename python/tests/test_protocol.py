@@ -120,7 +120,7 @@ def test_other_binary_tokens_allow_newline_bytes():
     assert encode("I", 10, 13) == b"I\x0a\x0d~"
 
 
-@pytest.mark.parametrize("token,echo", [("g", "G"), ("g", "g"), ("z", "Z"), ("p", "P"), ("p", "k")])
+@pytest.mark.parametrize("token,echo", [("g", "G"), ("g", "g"), ("z", "Z"), ("p", "P"), ("p", "k"), ("p", "p")])
 def test_rewritten_echo_completes(token, echo):
     # src/reaction.h:498, :506, :573, :627-629 rewrite the token before echoing it (:1557)
     lines = iter(["=", echo])

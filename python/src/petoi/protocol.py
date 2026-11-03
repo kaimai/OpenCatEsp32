@@ -74,8 +74,9 @@ class Reply:
         return "\n".join(self.lines)
 
 
-# Tokens the firmware rewrites before echoing (src/reaction.h:498, :506, :573, :627-629, echoed at :1557)
-_ECHOES = {"g": ("g", "G"), "z": ("z", "Z"), "p": ("P", "k")}
+# Tokens the firmware rewrites before echoing (src/reaction.h:498, :506, :573, :627-629, echoed at :1557).
+# The firmware never echoes a bare p, but the mock and WebSocketTransport's appended token do.
+_ECHOES = {"g": ("g", "G"), "z": ("z", "Z"), "p": ("p", "P", "k")}
 
 
 def echoes(token: str) -> Tuple[str, ...]:

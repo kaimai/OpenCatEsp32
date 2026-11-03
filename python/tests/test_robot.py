@@ -682,3 +682,10 @@ def test_s3_binary_joint_paces_the_following_command(monkeypatch):
 def test_send_g_completes_when_balance_turns_on():
     r = Robot(FakeStream({b"g\n": ["G"]}))
     assert r.send("g").completed
+
+
+def test_pause_completes_on_the_mock_and_wifi_fallback_echo():
+    # The firmware never echoes a bare p, but the mock and WebSocketTransport's appended token do
+    from petoi.transports.mock import MockTransport
+
+    assert Robot(MockTransport()).send("p").completed
