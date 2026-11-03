@@ -33,7 +33,7 @@ S3 facts this plan relies on. Each was checked in the S3 source on 2026-11-02:
   - failure prints `Timeout: Fail to connect web server!`, then `w`;
   - already connected prints `IP Address: <ip>. Wifi already connected`;
   - lines cited at `reaction.h:1225-1300`.
-- **Unknown token:** one line, `Undefined token! token: <whole command> <bytes…>`, which **includes the password**. It then echoes the *previous* token (`reaction.h:2621-2632`).
+- **Unknown token:** two lines, `Undefined token! token: w`, then `%<ssid>%<password> <bytes…>`, which **includes the password**. It then echoes the *previous* token (`reaction.h:2621-2632`; `printToAllPorts` ends a line by default, `io.h:88`). *Corrected after review: the plan first said one line.*
 - **BLE:**
   - the first `?` on a link gets `Petoi <MODEL>`, `u`, `<MODEL>`, `<version>`, `?`, sent as separate notifications with **no line breaks** (`petoiBleUartNimble.h:390-414`);
   - BiBoard instead pushes `Petoi <MODEL>` on connect and then rests (`src/bleUart.h:161-176`).

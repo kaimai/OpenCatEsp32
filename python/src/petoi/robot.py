@@ -26,6 +26,7 @@ _WIFI_JOINED_S3 = re.compile(rf"IP Address: {_IPV4} successfully connected")  # 
 _WIFI_ALREADY_S3 = re.compile(rf"IP Address: {_IPV4}\. Wifi already connected")  # OpenCatEsp32S3 reaction.h:1279
 _WIFI_FAILED_S3 = "Timeout: Fail to connect web server!"  # OpenCatEsp32S3 reaction.h:1270
 _WIFI_FAILED = "Fail to connect Wifi!"  # USB only (src/reaction.h:477)
+_VERSION = re.compile(r"[A-Z]\w*_\d{6}$")  # e.g. B10_260820, Q_261022
 _UNDEFINED = "Undefined token!"  # firmware built without WEB_SERVER (src/reaction.h:1535)
 
 
@@ -234,9 +235,12 @@ class Robot:
     def info(self) -> Dict[str, str]:
         """Return the robot's model and firmware version, e.g. {"model": "Bittle X", ...}."""
         reply = self._cmd("?")  # src/reaction.h:405-406
-        if len(reply.lines) < 2:
-            raise RobotError(f"unexpected reply to '?': {reply.lines}")
-        return {"model": reply.lines[0], "version": reply.lines[1]}
+        lines = reply.lines
+        # the version is BOARD_DATE (src/OpenCat.h:666); S3 can print unasked lines before the model
+        at = next((i for i, line in enumerate(lines) if i and _VERSION.match(line)), 1)
+        if len(lines) <= at:
+            raise RobotError(f"unexpected reply to '?': {lines}")
+        return {"model": lines[at - 1], "version": lines[at]}
 
     # --- Wi-Fi ------------------------------------------------------------
 
@@ -282,6 +286,10 @@ class Robot:
                         for rest in _lines(transport, deadline):
                             if rest == "w":
                                 break
+                    else:  # S3: the rest of the command (password included) follows on the next line (reaction.h:2621-2632)
+                        while transport.readline(0.3) is not None:
+                            pass
+                        transport.discard_input()
                     raise RobotError("this robot's firmware has no Wi-Fi support; update it with the Petoi Desktop App")
                 elif line == "w":  # echoed only when it did not reboot (src/reaction.h:1557)
                     if joined_now:

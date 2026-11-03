@@ -83,3 +83,11 @@ Items 1–4 below: plan part E.
 - [x] `tests/test_constants.py` reads `../src/Instinct*.h`, so it only runs from a repo checkout, not from an
   sdist. Fine for CI; skip it cleanly if the headers are missing.
 - [ ] Review error messages once more against real failures seen during hardware testing.
+- [ ] **BLE connect ignores `check_firmware=False` and `timeout`** (Part F review). `BleTransport._settle()` always sends
+  `?`, waits up to 2 s for a greeting plus up to 8 s for the rest to end, and fails after a fixed 5 s with no answer.
+  Before Part F, a BiBoard that didn't answer `?` still connected with a warning. Ported as-is from opencat-gemma.
+- [ ] **`?` retry doubles the wait before the old-firmware warning** (Part F review): a robot that never answers takes
+  2 × `timeout` (10 s by default). The retry is there for a sleeping Quaddle, which can't be told apart beforehand.
+- [ ] **Wi-Fi busy retry, unverified edge case** (Part F review): each attempt has its own deadline (up to 2 × timeout).
+  If the aborted task was a deferred one that finishes after the retry starts, `finishWebCommand()` might complete
+  the retry with the old command's results (`src/webServer.h:498-527`). Check on hardware: `walk()` then `stop()`.

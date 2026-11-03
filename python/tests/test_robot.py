@@ -86,6 +86,12 @@ def test_info_returns_model_and_version():
     assert r.info() == {"model": "Bittle X", "version": "B10_260820"}
 
 
+def test_info_skips_stray_lines_before_the_reply():
+    # S3 prints unasked lines on USB (e.g. "[BLE] ..."); the version is BOARD_DATE (src/OpenCat.h:666)
+    r = robot({b"?\n": ["[BLE] advertising restarted", "Quaddle", "Q_261022", "?"]})
+    assert r.info() == {"model": "Quaddle", "version": "Q_261022"}
+
+
 def test_context_manager_closes():
     r = robot()
     with r:
@@ -517,13 +523,15 @@ def test_setup_wifi_on_s3_when_already_on_wifi_warns_and_returns_the_ip():
 
 
 def test_setup_wifi_on_s3_firmware_without_wifi_fails_fast_and_hides_the_command():
-    # S3 prints the whole command (password included) on one line, then echoes the PREVIOUS token (reaction.h:2621-2632)
-    r = robot({SENT: [f"Undefined token! token: w%Home%{PW} 37 72", "k"]})
+    # S3 prints the token, then the rest of the command (password included) on the next line, then echoes the
+    # PREVIOUS token (OpenCatEsp32S3 reaction.h:2621-2632; printToAllPorts ends a line by default, io.h:88)
+    r = robot({SENT: ["Undefined token! token: w", f"%Home%{PW} 37 72", "k"]})
     start = time.monotonic()
     with pytest.raises(RobotError, match="no Wi-Fi support") as e:
         r.setup_wifi("Home", PW, timeout=5)
     assert time.monotonic() - start < 1
     assert_secret_kept(e.value)
+    assert r.transport.pending == []  # the password line isn't left for a later read
 
 
 def test_setup_wifi_bare_echo_means_not_accepted():
