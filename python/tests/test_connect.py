@@ -1,12 +1,16 @@
 import builtins
 import sys
+import warnings
 
 import pytest
 from serial.tools.list_ports_common import ListPortInfo
 
+from conftest import FakeStream
+
 import petoi
-from petoi.connect import classify, pick_serial_port
+from petoi.connect import _check_firmware, classify, pick_serial_port
 from petoi.errors import ConnectionFailed
+from petoi.robot import Robot
 from petoi.transports.mock import MockTransport
 
 
@@ -116,3 +120,49 @@ def test_connect_timeout_is_also_the_ble_scan_time(monkeypatch):
     with pytest.raises(ConnectionFailed):
         petoi.connect("ble", timeout=9)
     assert seen == {"address": None, "scan_timeout": 9}
+
+
+QUADDLE = {b"?\n": ["Quaddle", "Q_261022", "?"], b"z0\n": ["z0"]}  # OpenCatEsp32S3 reaction.h:1181-1185, :1324
+
+
+def test_s3_robot_is_told_to_stop_moving_on_its_own():
+    robot = Robot(FakeStream(QUADDLE), timeout=0.2)
+    _check_firmware(robot)
+    assert robot.s3 and robot.model == "Quaddle"
+    assert robot.transport.written == [b"?\n", b"z0\n"]
+
+
+def test_esp32_robot_never_gets_z0():
+    robot = Robot(FakeStream({b"?\n": ["Bittle X", "B10_260527", "?"]}), timeout=0.2)
+    _check_firmware(robot)  # 'z' toggles random mode on OpenCatEsp32 (src/reaction.h:494-498)
+    assert not robot.s3 and robot.transport.written == [b"?\n"]
+
+
+def test_unconfirmed_z0_warns():
+    robot = Robot(FakeStream({b"?\n": ["Quaddle", "Q_261022", "?"]}, auto_echo=False), timeout=0.1)
+    with pytest.warns(RuntimeWarning, match="move on its own"):
+        _check_firmware(robot)
+
+
+class WakesOnFirstCommand(FakeStream):
+    """A sleeping Quaddle wakes on the first command and doesn't answer it (opencat-gemma QUADDLE_S3_NOTES.md)."""
+
+    def write(self, data):
+        if not self.written:
+            self.written.append(data)
+            self.pending += ["Charge sleep: serial wake", "auto z1"]
+            return
+        super().write(data)
+
+
+def test_question_mark_is_retried_once_for_a_sleeping_robot():
+    robot = Robot(WakesOnFirstCommand(QUADDLE), timeout=0.1)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _check_firmware(robot)
+    assert robot.firmware == "Q_261022"
+
+
+def test_bluetooth_classic_hint_mentions_s3_robots():
+    with pytest.raises(ConnectionFailed, match="Quaddle"):
+        pick_serial_port([], bluetooth=True)

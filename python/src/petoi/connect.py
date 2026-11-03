@@ -6,8 +6,11 @@ from typing import List, Optional, Tuple
 
 from serial.tools import list_ports
 
-from petoi.errors import ConnectionFailed, PetoiError
+from petoi.constants import is_s3_firmware
+from petoi.errors import ConnectionFailed, PetoiError, RobotTimeout
+from petoi.protocol import encode
 from petoi.robot import Robot
+from petoi.transports.base import StreamTransport
 
 SSP_MARK = "_SSP"  # src/bluetoothManager.h:73
 MIN_FIRMWARE_DATE = "260820"  # firmware in this repo (src/OpenCat.h:80); the version hardware tests run against
@@ -43,7 +46,8 @@ def pick_serial_port(ports, bluetooth: bool) -> str:
     if not matches:
         what = "paired Bluetooth (_SSP)" if bluetooth else "USB"
         hint = (" On Windows or Linux the Bluetooth port has no _SSP in its name; pass the Bluetooth COM port "
-                "or /dev/rfcomm* port explicitly.") if bluetooth else ""
+                "or /dev/rfcomm* port explicitly. ESP32-S3 robots such as Quaddle have no Bluetooth Classic: "
+                "use petoi.connect(\"ble\").") if bluetooth else ""
         raise ConnectionFailed(f"No robot {what} port found. Ports seen: {[p.device for p in ports] or 'none'}.{hint}")
     raise ConnectionFailed(f"Several possible ports, pass one: {', '.join(p.device for p in matches)}")
 
@@ -73,9 +77,17 @@ def _open(kind: str, value: Optional[str], timeout: float):
 
 
 def _check_firmware(robot: Robot) -> None:
-    try:
-        info = robot.info()
-    except PetoiError:
+    info = None
+    for _ in range(2):  # a sleeping Quaddle wakes on the first command without answering it (opencat-gemma)
+        try:
+            info = robot.info()
+            break
+        except RobotTimeout:
+            if isinstance(robot.transport, StreamTransport):
+                robot.transport._unconfirmed.clear()  # the swallowed '?' will never echo
+        except PetoiError:
+            break
+    if info is None:
         warnings.warn("robot did not answer '?'; its firmware may be too old for this API", RuntimeWarning, stacklevel=3)
         return
     robot.model, robot.firmware = info["model"], info["version"]
@@ -83,6 +95,15 @@ def _check_firmware(robot: Robot) -> None:
     if len(date) == 6 and date.isdigit() and date < MIN_FIRMWARE_DATE:
         warnings.warn(f"firmware {info['version']} is older than {MIN_FIRMWARE_DATE}; some commands may not work. "
                       "Update it with the Petoi Desktop App.", RuntimeWarning, stacklevel=3)
+    if is_s3_firmware(robot.firmware):
+        _calm(robot)
+
+
+def _calm(robot: Robot) -> None:
+    # S3 firmware boots in random mind level 2 and moves its joints by itself when idle; z0 turns that
+    # off until the next reboot and echoes "z0" (OpenCatEsp32S3 reaction.h:1310-1331, randomMind.h:66, :161).
+    if not robot._run("z0", encode("z", 0), True, robot.timeout).completed:
+        warnings.warn("the robot did not confirm 'z0'; it may move on its own when idle", RuntimeWarning, stacklevel=4)
 
 
 def connect(target: Optional[str] = None, timeout: float = 5.0, check_firmware: bool = True) -> Robot:

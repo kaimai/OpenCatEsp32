@@ -8,7 +8,7 @@ import warnings
 from typing import Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 from petoi._timing import DOF, skill_seconds
-from petoi.constants import Joint, Skill
+from petoi.constants import Joint, Skill, is_s3_firmware
 from petoi.errors import RobotError, RobotTimeout, WifiSetupFailed
 from petoi.protocol import Reply, encode, parse_ints
 from petoi.transports.base import StreamTransport, Transport
@@ -40,6 +40,11 @@ class Robot:
         self.model: Optional[str] = None  # set by connect()
         self.firmware: Optional[str] = None  # set by connect()
         self._lock = threading.Lock()
+
+    @property
+    def s3(self) -> bool:
+        """True for OpenCatEsp32S3 firmware (e.g. Quaddle). Known after connect()."""
+        return is_s3_firmware(self.firmware)
 
     # --- raw access -------------------------------------------------------
 
