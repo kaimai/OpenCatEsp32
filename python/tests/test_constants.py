@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from petoi._timing import skill_seconds
-from petoi.constants import ONLY_ON, RISKY, Skill, Joint
+from petoi.constants import ONLY_ON, QUADDLE_SKILLS, RISKY, Joint, QuaddleJoint, Skill, is_s3_firmware, model_key, skills_for
 from petoi.transports.base import STALE_SECONDS
 
 SRC = Path(__file__).resolve().parents[2] / "src"
@@ -92,3 +92,46 @@ def test_skill_seconds_models_a_posture_and_a_looping_behavior():
     assert skill_seconds(behavior, start) == pytest.approx(0.008 + 6 * (0.008 + 0.1))
     with pytest.raises(ValueError):
         skill_seconds([-1, 0, 0, 1, 0, 0, -1, *row()], start)
+
+
+@pytest.mark.parametrize("reported, key", [
+    ("Bittle X", "bittle"), ("Bittle X+Arm", "bittle_arm"), ("Nybble Q", "nybble"), ("Quaddle", "quaddle"),
+    ("Mock Bittle", "bittle"), ("DoF16", None), (None, None),
+])
+def test_model_key_maps_the_question_mark_reply(reported, key):
+    assert model_key(reported) == key
+
+
+@pytest.mark.parametrize("version, s3", [("Q_261022", True), ("C_261102", True), ("B10_260527", False), (None, False)])
+def test_s3_firmware_is_recognised_by_its_board_letter(version, s3):
+    assert is_s3_firmware(version) is s3  # OpenCatEsp32S3 OpenCat.h:25-37, :1313
+
+
+def test_skills_for_esp32_models_follow_only_on():
+    assert skills_for("bittle") == {s for s in Skill if "bittle" in ONLY_ON.get(s, TABLES)}
+    assert Skill.WASH_FACE in skills_for("nybble") and Skill.WASH_FACE not in skills_for("bittle")
+
+
+def test_skills_for_quaddle_is_its_own_table():
+    assert skills_for("quaddle") == QUADDLE_SKILLS
+    assert Skill.BACK_FLIP in QUADDLE_SKILLS and Skill.HUNT not in QUADDLE_SKILLS
+    with pytest.raises(ValueError, match="unknown model"):
+        skills_for("chero")
+
+
+def test_quaddle_joints_are_petoi_web_coding_indices():
+    # PetoiWebCoding js/product_config.js: legs 2-5 (LF, RF, RB, LB) on every Quaddle; head pan 0 on Scout only
+    assert [int(j) for j in QuaddleJoint] == [0, 2, 3, 4, 5]
+    assert QuaddleJoint.HEAD_PAN == 0
+
+
+S3_SRC = os.environ.get("PETOI_S3_SRC")  # src/ of a private OpenCatEsp32S3 checkout; never vendored here
+needs_s3 = pytest.mark.skipif(not S3_SRC, reason="set PETOI_S3_SRC to an OpenCatEsp32S3 src/ folder")
+
+
+@needs_s3
+def test_quaddle_skills_match_its_instinct_table():
+    line = next(l for l in (Path(S3_SRC) / "Instinct_Quaddle.h").read_text(errors="replace").splitlines()
+                if "skillNameWithType[]" in l)
+    names = {n[:-1] for n in re.findall(r'"([^"]+)"', line)}
+    assert {s for s in Skill if s.value in names} == QUADDLE_SKILLS
