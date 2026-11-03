@@ -6,7 +6,7 @@ import pytest
 import petoi
 import scenario
 from petoi import Skill
-from petoi.constants import ONLY_ON, RISKY
+from petoi.constants import RISKY, model_key, skills_for
 from petoi.transports.base import STALE_SECONDS, StreamTransport
 from test_constants import estimate_seconds
 
@@ -29,8 +29,8 @@ def test_scenario(robot):
 
 @pytest.mark.parametrize("skill", list(Skill))
 def test_every_skill_completes(robot, skill):
-    model = "nybble" if "nybble" in (robot.model or "").lower() else "bittle"  # an arm build reports as Bittle
-    if model not in ONLY_ON.get(skill, {model}):
+    model = model_key(robot.model) or "bittle"
+    if skill not in skills_for(model):
         pytest.skip(f"{skill.value} is not on {robot.model}")
     if skill in RISKY and not os.environ.get("PETOI_RISKY"):
         pytest.skip("flips, falls and test postures; set PETOI_RISKY=1 with the robot on the floor")
@@ -38,7 +38,8 @@ def test_every_skill_completes(robot, skill):
     start = time.monotonic()
     robot.skill(skill)
     elapsed = time.monotonic() - start
-    print(f"\n{skill.value}: {elapsed:.1f} s (estimate {estimate_seconds(model, skill.value):.1f} s)")
+    estimate = f" (estimate {estimate_seconds(model, skill.value):.1f} s)" if model != "quaddle" else ""
+    print(f"\n{skill.value}: {elapsed:.1f} s{estimate}")
     assert elapsed < STALE_SECONDS  # a later echo could be taken for a newer command's
 
 

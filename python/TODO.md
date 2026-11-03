@@ -22,9 +22,16 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   (the code implies about 2 s; the README says about 3 s). Record the measured reboot time here.
 - [ ] **`back("right")` sends `kbkR`.** By reading `src/skill.h:55-58` it resolves by prefix and is mirrored (`:483`),
   the same path `walk("right")` uses. Not yet seen on a robot.
-- [ ] **Bittle with the robot arm.** The hardware test treats any non-Nybble model as plain Bittle, so it cannot
-  skip `BACK_FLIP`, `FRONT_FLIP` and `ROLL`, which the arm build lacks (they are in `RISKY`, so they only run with
-  `PETOI_RISKY=1`). Find out what `?` reports on an arm build.
+- [ ] **Bittle with the robot arm.** The hardware test skips `BACK_FLIP`, `FRONT_FLIP` and `ROLL` (which the arm build
+  lacks) only if `?` reports a model containing "arm"; otherwise it treats the robot as plain Bittle. Find out what
+  `?` reports on an arm build.
+- [ ] **Quaddle (S3 firmware)**: run `tests/hardware/test_s3.py` and `test_smoke.py` over USB, BLE and Wi-Fi
+  (`-s`, since `test_s3.py` asks you what you saw). Check: the `?` retry on a sleeping robot, the BLE handshake, `z0`
+  keeping it still, leg order, that Scout's extra joint is the head pan at index 0 (`PETOI_SCOUT=1`; assumed from
+  PetoiWebCoding and the firmware's HEADPAN define), skill timings (the estimator is unverified for 6 joints), and
+  `setup_wifi()` without a reboot.
+- [ ] **BLE connect on Bittle X after Part F**: connect now always asks `?` and waits for the forced rest. opencat-gemma
+  made the same change, but it wasn't checked on a Bittle X there either.
 
 ## Needs the owner
 
@@ -50,6 +57,9 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
 - [ ] **`skill_timeout` default (30 s).** Chosen for now (plan part C). Revisit after timing every skill on hardware.
 - [ ] **Value 126 in uploaded skills.** `run_skill_data()` rejects it (plan part B); clamping to 125/127 was the alternative. Owner undecided.
 - [ ] **Uploaded behaviors over Wi-Fi return when they start**, because the firmware finishes the web task at the first `K` echo (`src/reaction.h:1565`). Owner undecided whether to accept this or ask for a firmware change.
+- [ ] **Chero** (S3, board C): later, per owner. Needs its own skill table (no crawl, side gaits or bk) and joint map.
+- [ ] **Bittle/Nybble on S3 firmware**: not detected or supported; S3 Bittle lacks knock and lucky.
+- [ ] **Quaddle extended behaviors** (over 127 frames, -128 header): refused for now.
 
 ## Feature candidates (each needs a plan amendment first)
 

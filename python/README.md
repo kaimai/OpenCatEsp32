@@ -99,12 +99,24 @@ with petoi.connect(ip) as robot:  # now over Wi-Fi; the cable can come out
     robot.sit()
 ```
 
-- It takes up to a minute: the robot tries the network up to 3 times, then reboots to start its Wi-Fi server. `setup_wifi()` returns once it is back.
+- It takes up to a minute: the robot tries the network up to 3 times, then reboots to start its Wi-Fi server. `setup_wifi()` returns once it is back. (A Quaddle starts its Wi-Fi server without rebooting.)
 - The robot remembers the network and joins it every time it starts.
 - 2.4 GHz networks only. The name is 1 to 32 bytes and cannot contain `%`. The password is up to 64 characters; use `""` for an open network.
 - A wrong name or password raises `petoi.WifiSetupFailed`. Your password never appears in error messages (the robot's own serial monitor shows its last 4 characters).
 - If the robot is already on Wi-Fi it ignores the new details, and `setup_wifi()` returns its current address with a warning. To switch networks, hold the robot's BOOT button for about 3 seconds to clear the saved one, then run `setup_wifi()` again.
 - USB only: over Bluetooth the reboot drops the link.
+
+### Robots and firmware
+
+| Robot | Firmware | Links | Joints |
+|---|---|---|---|
+| Bittle X, Bittle X+Arm, Nybble Q | OpenCatEsp32 (BiBoard) | USB, Bluetooth, BLE, Wi-Fi | `Joint` (16) |
+| Quaddle | OpenCatEsp32S3 | USB, BLE, Wi-Fi (no Bluetooth Classic) | `QuaddleJoint`: 4 legs; Quaddle Scout also has `HEAD_PAN` |
+
+`robot.s3` tells you which firmware you're on. On S3 firmware, `connect()` sends `z0` so the robot stops moving
+by itself when idle (until it reboots). On a Quaddle, `send_binary("I"/"M")` over USB is never confirmed. Use
+`joint()` / `move_joints()` instead. Skills: `petoi.constants.skills_for("quaddle")` lists the `Skill` members a
+Quaddle has. Its other skills work with `robot.skill("name")`.
 
 ## High-level methods
 
