@@ -64,11 +64,12 @@ def test_command_round_trip_ignores_other_tasks(port):
     assert reply.lines == ["Bittle X", "B10_260820"]
 
 
-def test_rejection_error_carries_running_tasks_id(port):
+def test_busy_robot_aborts_the_old_task_and_runs_the_retry(port):
     t = WebSocketTransport("127.0.0.1", port=port, heartbeat=False)
     assert t.command("s", b"slow\n", timeout=0.2).completed is False
-    with pytest.raises(RobotError, match="still busy with the previous command"):
-        t.command("b", b"bad\n", timeout=2.0)
+    reply = t.command("b", b"bad\n", timeout=2.0)  # rejected once, which aborts "slow"; the retry runs
+    assert reply.completed
+    assert [m["commands"] for m in received] == [["slow"], ["bad"], ["bad"]]
     t.close()
 
 

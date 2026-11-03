@@ -29,6 +29,10 @@ _HAS_PORT = re.compile(r":\d+$")
 _CLIENT_LIMIT_HINT = "(the robot allows at most 2 Wi-Fi clients; is the app connected?)"
 
 
+class _Busy(RobotError):
+    """The robot rejected our task because an earlier one was running; that rejection also aborted it."""
+
+
 class WebSocketTransport(Transport):
     """Wi-Fi link to the robot's WebSocket server.
 
@@ -101,6 +105,17 @@ class WebSocketTransport(Transport):
                 return
 
     def command(self, token: str, payload: bytes, timeout: Optional[float]) -> Reply:
+        # The firmware's rejection of an overlapping task also aborts the running one (src/webServer.h:487-512),
+        # so one retry gets our command through, e.g. stop() during a walk (opencat-gemma links.py WsLink.send).
+        try:
+            return self._command_once(token, payload, timeout)
+        except _Busy:
+            try:
+                return self._command_once(token, payload, timeout)
+            except _Busy:
+                raise RobotError("robot is still busy with the previous command; wait for it to finish") from None
+
+    def _command_once(self, token: str, payload: bytes, timeout: Optional[float]) -> Reply:
         # The firmware runs one web task at a time and rejects overlaps,
         # so Wi-Fi commands always wait for completion.
         deadline = time.monotonic() + (timeout or self._default_timeout)
@@ -125,7 +140,7 @@ class WebSocketTransport(Transport):
                 # and aborts that task; ours was never stored (src/webServer.h:346-347, :487-512).
                 self._outstanding.remove(tid)
                 self._outstanding.remove(task_id)
-                raise RobotError("robot is still busy with the previous command; wait for it to finish")
+                raise _Busy()
             if status == "completed" and tid in self._outstanding:
                 self._outstanding.remove(tid)
             if tid != task_id:
