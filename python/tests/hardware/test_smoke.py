@@ -5,7 +5,7 @@ import pytest
 
 import petoi
 import scenario
-from petoi import Skill
+from petoi import QuaddleJoint, Skill
 from petoi.constants import RISKY, model_key, skills_for
 from petoi.transports.base import STALE_SECONDS, StreamTransport
 from test_constants import estimate_seconds
@@ -23,7 +23,23 @@ def robot(request):
         r.rest()
 
 
+def _quaddle(robot):
+    return model_key(robot.model) == "quaddle"
+
+
+def _layout(robot):
+    """(joint count, a joint safe to turn by 20-30 degrees while standing).
+
+    Quaddle has 6 joints and a head only on Scout (OpenCatEsp32S3 OpenCat.h:155-165);
+    its front-left leg is used instead. Not yet tried on a Quaddle."""
+    if _quaddle(robot):
+        return 6, int(QuaddleJoint.LEFT_FRONT_LEG)
+    return 16, int(petoi.Joint.HEAD_PAN)
+
+
 def test_scenario(robot):
+    if _quaddle(robot):
+        pytest.skip("scenario moves head joints; tests/hardware/test_s3.py covers Quaddle")
     scenario.run(robot)
 
 
@@ -57,6 +73,8 @@ def test_back_turning_completes(robot, direction):
 
 
 def test_long_command_arrives_intact(robot):
+    if _quaddle(robot):
+        pytest.skip("Quaddle's 4 leg joints make a short command; the upload tests cover long writes")
     # Assumption 1: BLE chunking. 7 joint pairs = a 30+ character ASCII command.
     angles = {int(petoi.Joint.HEAD_PAN): 10, 8: 20, 9: 20, 10: 20, 11: 20, 12: 10, 13: 10}
     robot.move_joints(angles)
@@ -86,24 +104,27 @@ def test_gyro_state_over_usb(robot, request):
 
 
 def _standing(robot):
+    count, _ = _layout(robot)
     robot.stand()
     angles = robot.joints()
-    assert len(angles) == 16 and all(-125 <= a <= 125 for a in angles), angles
+    assert len(angles) == count and all(-125 <= a <= 125 for a in angles), angles
     return angles
 
 
 def test_uploaded_posture_turns_the_head(robot):
+    _, joint = _layout(robot)
     angles = _standing(robot)
-    angles[petoi.Joint.HEAD_PAN] = 20
+    angles[joint] = 20
     robot.run_skill_data([1, 0, 0, 1] + angles)
-    scenario.wait_for_angle(robot, petoi.Joint.HEAD_PAN, 20)
+    scenario.wait_for_angle(robot, joint, 20)
     robot.stand()
 
 
 def test_uploaded_behavior_returns_after_it_finishes(robot):
+    _, joint = _layout(robot)
     angles = _standing(robot)
     look = list(angles)
-    look[petoi.Joint.HEAD_PAN] = 30
+    look[joint] = 30
     frames = [angles + [8, 10, 0, 0], look + [8, 10, 0, 0], angles + [8, 0, 0, 0]]  # two 500 ms pauses
     start = time.monotonic()
     robot.run_skill_data([-3, 0, 0, 1, 0, 0, 0] + [v for f in frames for v in f])
@@ -114,10 +135,23 @@ def test_uploaded_behavior_returns_after_it_finishes(robot):
 
 
 def test_largest_upload_arrives_intact(robot):
+    _, joint = _layout(robot)
     angles = _standing(robot)
     last = list(angles)
-    last[petoi.Joint.HEAD_PAN] = 20
-    frames = [angles + [0, 0, 0, 0]] * 123 + [last + [0, 0, 0, 0]]  # 124 frames, 2487 bytes, speed 0 = jump
+    last[joint] = 20
+    frames = [angles + [0, 0, 0, 0]] * 123 + [last + [0, 0, 0, 0]]  # 124 frames; 2487 bytes on 16 joints, 1247 on Quaddle
     robot.run_skill_data([-124, 0, 0, 1, 0, 0, 0] + [v for f in frames for v in f])
-    scenario.wait_for_angle(robot, petoi.Joint.HEAD_PAN, 20)  # lost bytes would misalign the last frame
+    scenario.wait_for_angle(robot, joint, 20)  # lost bytes would misalign the last frame
     robot.skill(Skill.BALANCE)  # "kbalance" must still fit (src/skill.h:131-137)
+
+
+def test_stop_right_after_unwaited_walk_is_not_lost(robot):
+    # Without WRITE_GAP the firmware can read "kwkF\nkbalance\n" as one command (src/moduleManager.h:404-440).
+    # stop()'s echo alone can't prove it worked: whether a merged, unknown skill name still echoes "k" is unverified.
+    robot.walk(wait=False)
+    robot.stop()
+    time.sleep(0.5)
+    first = robot.joints()
+    time.sleep(0.5)
+    second = robot.joints()
+    assert all(abs(a - b) <= 3 for a, b in zip(first, second)), (first, second)  # still walking: the stop was lost
