@@ -34,6 +34,7 @@ Read in the firmware but **not verified on the robot**:
 
 1. **S3 `melody(wait=False)` raises `ValueError`.** The computer has to time each note, so it can't return early. (Alternative: play in a background thread; more code and a lock held across calls.)
 2. **The split write applies to every serial link (USB and Bluetooth Classic) and every firmware**, for commands longer than 64 bytes. It costs 50 ms per long command. Bittle X was not tested, but the old TODO already suspected unpaced long writes there.
+   **Narrowed after the Codex review:** only `K` and `b`/`B` are split. Every other command ends after 10 ms of silence (`src/OpenCat.h:68`, `src/moduleManager.h:402`), so a 50 ms pause would cut a long `i` or `w` command in two.
 3. **Upload tests need `PETOI_ON_STAND=1`.** A misaligned upload can drive the joints to any angle.
 4. **The fall watcher stops the whole run on `EXCEPTION: Pushed` and `Knocked` too**, not only falls. If it stops runs for normal skills, relax it later.
 5. **Firmware follow-up (out of scope, owner's call):** a larger receive buffer (`Serial.setRxBufferSize()` before `Serial.begin()`) in both firmwares would fix lost bytes for every client. Not done here.

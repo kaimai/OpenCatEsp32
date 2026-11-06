@@ -15,7 +15,7 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
 - [ ] **Uploaded skills (`run_skill_data`)** (plan part B):
   `PETOI_ON_STAND=1 pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi, robot on a stand.
   On Quaddle USB (2026-11-05, Part H) a 124-frame upload in one write lost bytes 1 in 3 times, and so did 20-byte slices
-  1 ms apart (the Desktop App tester's pacing); `SerialTransport` now sends the first 64 bytes, waits 50 ms, then the
+  1 ms apart (the Desktop App tester's pacing); `SerialTransport` now sends the first 64 bytes of a long `K`/`b`/`B` command (the only ones the firmware waits 200 ms for), waits 50 ms, then the
   rest, which passed 20 of 20. Still to check: the same on Bittle X (2487 bytes), and over Bluetooth Classic.
   Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
 - [ ] **Wi-Fi setup (`setup_wifi`)** (plan part A):
