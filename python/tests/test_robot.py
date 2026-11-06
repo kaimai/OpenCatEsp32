@@ -689,3 +689,36 @@ def test_pause_completes_on_the_mock_and_wifi_fallback_echo():
     from petoi.transports.mock import MockTransport
 
     assert Robot(MockTransport()).send("p").completed
+
+
+def test_s3_melody_waits_out_the_tune_after_its_early_echo(monkeypatch):
+    # S3 echoes b as the tune starts and plays it on (Quaddle Q_261027, 2026-11-05: echo after 0.07 s)
+    import petoi.robot as robot_module
+
+    slept = []
+    monkeypatch.setattr(robot_module.time, "sleep", slept.append)
+    r = Robot(FakeStream(), timeout=0.2)
+    r.firmware = "Q_261027"
+    assert r.melody([(12, 4), (14, 4), (16, 2)]).completed
+    assert r.transport.written == [b"b12 4 14 4 16 2\n"]
+    assert slept == [pytest.approx(1.0, abs=0.05)]
+
+
+def test_s3_melody_without_wait_returns_at_once(monkeypatch):
+    import petoi.robot as robot_module
+
+    slept = []
+    monkeypatch.setattr(robot_module.time, "sleep", slept.append)
+    r = Robot(FakeStream(auto_echo=False), timeout=0.2)
+    r.firmware = "Q_261027"
+    r.melody([(12, 4)], wait=False)
+    assert slept == []
+
+
+def test_esp32_melody_relies_on_the_late_echo(monkeypatch):
+    import petoi.robot as robot_module
+
+    slept = []
+    monkeypatch.setattr(robot_module.time, "sleep", slept.append)
+    robot().melody([(12, 4)])
+    assert slept == []

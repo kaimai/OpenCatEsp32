@@ -249,6 +249,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 3: Play S3 melodies one note at a time
 
+> **Revised 2026-11-05 after Task 1 (approved by the owner): not built as written below.** The listening test showed one
+> `b12 4 14 4 16 2` command plays all three rising notes on Q_261027, so the source reading in "What the hardware run
+> found" was wrong. Only the early echo is real. Built instead: `melody()` still sends one command; on S3 with
+> `wait=True` it sleeps out the rest of the tune's length after the echo; `wait=False` works on S3 too (decision 1 is
+> dropped). Tests: `test_s3_melody_waits_out_the_tune_after_its_early_echo`, `test_s3_melody_without_wait_returns_at_once`,
+> `test_esp32_melody_relies_on_the_late_echo`. The steps below are kept as the original plan.
+
 **Files:**
 - Modify: `python/src/petoi/robot.py` (`beep`, `melody`)
 - Test: `python/tests/test_robot.py`

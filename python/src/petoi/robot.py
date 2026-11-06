@@ -192,7 +192,9 @@ class Robot:
     # --- misc -------------------------------------------------------------
 
     def beep(self, note: int, duration: int) -> Reply:
-        """Play one note: semitones above C6 (0 is a rest), lasting 1/duration s (8 = 125 ms)."""
+        """Play one note: semitones above C6 (0 is a rest), lasting 1/duration s (8 = 125 ms).
+
+        On S3 firmware (Quaddle) it returns as the note starts."""
         return self._cmd("b", note, duration)
 
     def melody(self, notes: Sequence[Tuple[int, int]], wait: bool = True) -> Reply:
@@ -208,7 +210,12 @@ class Robot:
                 raise ValueError(f"duration must be at least 1, got {duration!r}")  # the firmware skips it (:1003)
             flat += [note, duration]
         length = sum(1 / d for _, d in notes)  # 1000/d ms per note (src/reaction.h:1004)
-        return self._cmd("b", *flat, wait=wait, timeout=self.timeout + length)
+        start = time.monotonic()
+        reply = self._cmd("b", *flat, wait=wait, timeout=self.timeout + length)
+        if self.s3 and wait:
+            # S3 echoes as the tune starts and plays it on (Quaddle Q_261027, 2026-11-05: echo after 0.07 s)
+            time.sleep(max(0.0, length - (time.monotonic() - start)))
+        return reply
 
     def gyro(self, on: bool) -> Reply:
         """Turn gyro balancing on or off. Turn it off before tricks it would fight."""
