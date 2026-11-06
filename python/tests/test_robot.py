@@ -722,3 +722,23 @@ def test_esp32_melody_relies_on_the_late_echo(monkeypatch):
     monkeypatch.setattr(robot_module.time, "sleep", slept.append)
     robot().melody([(12, 4)])
     assert slept == []
+
+
+def test_s3_melody_waits_the_whole_tune_even_after_a_slow_send(monkeypatch):
+    # time spent before the echo (lock, pacing, long-write pause) isn't playback
+    import petoi.robot as robot_module
+
+    clock, slept = [0.0], []
+    monkeypatch.setattr(robot_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(robot_module.time, "sleep", slept.append)
+    r = Robot(FakeStream(), timeout=0.2)
+    r.firmware = "Q_261027"
+    command = r.transport.command
+
+    def slow(token, payload, timeout):
+        clock[0] += 2.0  # e.g. another thread held the lock
+        return command(token, payload, timeout)
+
+    r.transport.command = slow
+    r.melody([(12, 4), (14, 4), (16, 2)])
+    assert slept == [pytest.approx(1.0)]

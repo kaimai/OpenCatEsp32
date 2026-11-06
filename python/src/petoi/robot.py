@@ -210,11 +210,11 @@ class Robot:
                 raise ValueError(f"duration must be at least 1, got {duration!r}")  # the firmware skips it (:1003)
             flat += [note, duration]
         length = sum(1 / d for _, d in notes)  # 1000/d ms per note (src/reaction.h:1004)
-        start = time.monotonic()
         reply = self._cmd("b", *flat, wait=wait, timeout=self.timeout + length)
         if self.s3 and wait:
-            # S3 echoes as the tune starts and plays it on (Quaddle Q_261027, 2026-11-05: echo after 0.07 s)
-            time.sleep(max(0.0, length - (time.monotonic() - start)))
+            # S3 echoes as the tune starts and plays it on (Quaddle Q_261027, 2026-11-05: echo after 0.07 s).
+            # Wait it all out from the echo: time before the echo (lock, pacing) isn't playback.
+            time.sleep(length)
         return reply
 
     def gyro(self, on: bool) -> Reply:
