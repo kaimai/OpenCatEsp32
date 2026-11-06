@@ -8,6 +8,7 @@ import scenario
 from petoi import QuaddleJoint, Skill
 from petoi.constants import RISKY, model_key, skills_for
 from petoi.transports.base import STALE_SECONDS, StreamTransport
+from safety import on_stand, stop_on_trouble, watch  # noqa: F401 (stop_on_trouble is an autouse fixture)
 from test_constants import estimate_seconds
 
 TARGETS = [os.environ[k] for k in ("PETOI_PORT", "PETOI_BT", "PETOI_BLE", "PETOI_WS") if os.environ.get(k)]
@@ -19,6 +20,7 @@ pytestmark = [pytest.mark.hardware, pytest.mark.skipif(not TARGETS, reason="no r
 def robot(request):
     with petoi.connect(request.param) as r:
         print(f"\n{request.param}: {r.model} firmware {r.firmware}")
+        watch(r)
         yield r
         r.rest()
 
@@ -111,6 +113,7 @@ def _standing(robot):
     return angles
 
 
+@on_stand
 def test_uploaded_posture_turns_the_head(robot):
     _, joint = _layout(robot)
     angles = _standing(robot)
@@ -120,6 +123,7 @@ def test_uploaded_posture_turns_the_head(robot):
     robot.stand()
 
 
+@on_stand
 def test_uploaded_behavior_returns_after_it_finishes(robot):
     _, joint = _layout(robot)
     angles = _standing(robot)
@@ -134,12 +138,13 @@ def test_uploaded_behavior_returns_after_it_finishes(robot):
     robot.stand()
 
 
+@on_stand
 def test_largest_upload_arrives_intact(robot):
     _, joint = _layout(robot)
     angles = _standing(robot)
     last = list(angles)
     last[joint] = 20
-    frames = [angles + [0, 0, 0, 0]] * 123 + [last + [0, 0, 0, 0]]  # 124 frames; 2487 bytes on 16 joints, 1247 on Quaddle
+    frames = [angles + [8, 0, 0, 0]] * 123 + [last + [8, 0, 0, 0]]  # speed 8; never 0 on hardware. 124 frames: 2487 bytes on 16 joints, 1247 on Quaddle
     robot.run_skill_data([-124, 0, 0, 1, 0, 0, 0] + [v for f in frames for v in f])
     scenario.wait_for_angle(robot, joint, 20)  # lost bytes would misalign the last frame
     robot.skill(Skill.BALANCE)  # "kbalance" must still fit (src/skill.h:131-137)

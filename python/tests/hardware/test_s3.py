@@ -6,6 +6,7 @@ import pytest
 
 import petoi
 from petoi import QuaddleJoint
+from safety import stop_on_trouble, watch  # noqa: F401 (stop_on_trouble is an autouse fixture)
 
 TARGETS = [os.environ[k] for k in ("PETOI_PORT", "PETOI_BLE", "PETOI_WS") if os.environ.get(k)]
 pytestmark = [pytest.mark.hardware, pytest.mark.skipif(not TARGETS, reason="no robot configured")]
@@ -20,6 +21,7 @@ def robot(request):
         r.close()
         pytest.skip(f"{r.model} {r.firmware} is not S3 firmware")
     print(f"\n{request.param}: {r.model} firmware {r.firmware}")
+    watch(r)
     yield r
     r.rest()
     r.close()
@@ -53,3 +55,9 @@ def test_robot_stays_still_after_connect(robot):
     robot.stand()
     input("Leave the robot idle for 10 s and watch it. Press Enter when done")
     assert input("Did it stay still (no random head or leg moves)? [y/n] ").strip().lower() == "y"
+
+
+def test_melody_plays_every_note(robot):
+    input("Listen; press Enter to play three notes")
+    robot.melody([(12, 4), (14, 4), (16, 2)])
+    assert input("Did you hear three notes? [y/n] ").strip().lower() == "y"
