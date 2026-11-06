@@ -132,7 +132,7 @@ Quaddle has. Its other skills work with `robot.skill("name")`.
 | `joint(Joint.HEAD_PAN, 30)` | Move one joint to an angle in degrees (decimals are rounded to the nearest degree) |
 | `move_joints({Joint.HEAD_PAN: 30, Joint.HEAD_TILT: 10})` | Move several joints together. `sequential=True` moves them one after another |
 | `joints()` | Current angle of every joint, as a list indexed by joint number |
-| `beep(note, duration)` | Play one note: `note` is semitones above C6 (0 is a rest); it lasts 1/`duration` of a second, so `beep(12, 8)` is 125 ms |
+| `beep(note, duration)` | Play one note: `note` is semitones above C6 (0 is a rest); it lasts 1/`duration` of a second, so `beep(12, 8)` is 125 ms. On Quaddle it returns as the note starts |
 | `melody([(12, 8), (14, 8), (16, 4)])` | Play several `(note, duration)` pairs; returns when the tune ends |
 | `gyro(on)` | Turn gyro balancing on or off (off before tricks it would fight) |
 | `gyro_state()` | `{"update", "balance", "print", "fine"}` flags as booleans; USB only (raises `RobotError` over Bluetooth/Wi-Fi) |

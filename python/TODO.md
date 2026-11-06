@@ -13,9 +13,11 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   head-move timing, 15 s echo window, retries) plus `gyro`, `melody`, `back("left"/"right")` and every `Skill` the model has.
 - [ ] Time every `Skill` on hardware (`pytest tests/hardware -k every_skill -s`); each line prints the measured time next to the firmware-based estimate (`petoi._timing`, longest: Nybble `hunt` about 10.4 s). Petoi's Desktop App tester allows 30 s for `clap`, `pee` and `hunt`, so compare against that too.
 - [ ] **Uploaded skills (`run_skill_data`)** (plan part B):
-  `pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi. `test_largest_upload_arrives_intact`
-  sends 2487 bytes in one unpaced write; if it fails on USB, add paced writes (the Desktop App tester sends 20-byte
-  slices 1 ms apart). Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
+  `PETOI_ON_STAND=1 pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi, robot on a stand.
+  On Quaddle USB (2026-11-05, Part H) a 124-frame upload in one write lost bytes 1 in 3 times, and so did 20-byte slices
+  1 ms apart (the Desktop App tester's pacing); `SerialTransport` now sends the first 64 bytes, waits 50 ms, then the
+  rest, which passed 20 of 20. Still to check: the same on Bittle X (2487 bytes), and over Bluetooth Classic.
+  Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
 - [ ] **Wi-Fi setup (`setup_wifi`)** (plan part A):
   `PETOI_PORT=/dev/cu.usbserial-XXXX PETOI_WIFI_SSID=... PETOI_WIFI_PASSWORD=... .venv/bin/python -m pytest tests/hardware/test_wifi_setup.py -v -s`.
   Checks that the USB link survives `ESP.restart()`, the reboot time (60 s default assumed), and the BOOT-button reset
@@ -25,13 +27,19 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
 - [ ] **Bittle with the robot arm.** The hardware test skips `BACK_FLIP`, `FRONT_FLIP` and `ROLL` (which the arm build
   lacks) only if `?` reports a model containing "arm"; otherwise it treats the robot as plain Bittle. Find out what
   `?` reports on an arm build.
-- [ ] **Quaddle (S3 firmware)**: run `tests/hardware/test_s3.py` and `test_smoke.py` over USB, BLE and Wi-Fi
-  (`-s`, since `test_s3.py` asks you what you saw; the upload tests turn the front-left leg on Quaddle, which hasn't been tried). Check: the `?` retry on a sleeping robot, the BLE handshake, `z0`
-  keeping it still, leg order, that Scout's extra joint is the head pan at index 0 (`PETOI_SCOUT=1`; assumed from
-  PetoiWebCoding and the firmware's HEADPAN define), skill timings (the estimator is unverified for 6 joints), and
-  `setup_wifi()` without a reboot.
-- [ ] **`WRITE_GAP` (50 ms, Part G)**: run `pytest tests/hardware -k stop_right_after -s` on USB and Bluetooth. If the robot keeps walking,
-  the gap is too short. Also try `wait=False` bursts during a melody, which pacing can't fix (the firmware isn't reading then:
+- [ ] **Quaddle (S3 firmware)**: first USB run 2026-11-05 on Q_261027 (CH343 USB chip): `test_s3` leg test passed;
+  smoke tests 18 passed, 3 failed, all fixed in Part H (melody confirmed early, long upload lost bytes, and a stop test
+  that failed only after the bad upload). Skill times: `sit` 0.4 s, `up` 0.1, `balance` 0.4, `str` 0.4, `hi` 3.3,
+  `pee` 2.4, `scrh` 1.8, `hsk` 1.7, `hds` 3.2, `kc` 1.0, `nd` 1.3, `wh` 1.3, `dropRec` 0.4. A single `b` with three
+  notes plays all three (heard), but echoes after 0.07 s. Still open: rerun on USB after Part H with
+  `PETOI_ON_STAND=1`; BLE and Wi-Fi; the `?` retry on a sleeping robot, the BLE handshake, `z0` keeping it still,
+  leg order, Scout's head pan at index 0 (`PETOI_SCOUT=1`), and `setup_wifi()` without a reboot. The USB link dropped
+  out several times that day before it stayed up; a cable or hub problem is likely but unconfirmed.
+- [ ] **Run hardware tests with the robot on a stand** (`PETOI_ON_STAND=1` for uploads). On 2026-11-05 the robot fell
+  several times and couldn't get up while probe scripts drove it free-standing (speed-0 and misaligned uploads).
+  `tests/hardware/safety.py` now ends the run on a fall, push, knock or `Trigger released` line (USB, Bluetooth, BLE).
+- [ ] **`WRITE_GAP` (50 ms, Part G)**: passed on Quaddle USB (2026-11-05, run on its own). Still to run on Bluetooth:
+  `pytest tests/hardware -k stop_right_after -s`. If the robot keeps walking, the gap is too short. Also try `wait=False` bursts during a melody, which pacing can't fix (the firmware isn't reading then:
   `OpenCatEsp32.ino:86-89`).
 - [ ] **BLE connect on Bittle X after Part F**: connect now always asks `?` and waits for the forced rest. opencat-gemma
   made the same change, but it wasn't checked on a Bittle X there either.
@@ -52,6 +60,9 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   | `opencat` / `OpenCat` | taken: unrelated desktop-cat app, v0.2.1 (github.com/Jacobzwj/opencat) |
   | `open-cat` | free on lookup, but likely refused as too close to `opencat` (unverified) |
 - [ ] **Branch:** merge locally, open a PR, keep, or discard. Hardware testing first is the safer order.
+- [ ] **Firmware: larger serial receive buffer.** `Serial.setRxBufferSize()` before `Serial.begin()` in OpenCatEsp32 and
+  OpenCatEsp32S3 would stop long commands losing bytes for every client, not only `petoi` (Part H). The buffer size on
+  current builds wasn't checked.
 - [ ] **Backup ref.** `refs/original/refs/heads/feature/python-api` is left from the commit-trailer rewrite.
   Delete it once the history is confirmed: `git update-ref -d refs/original/refs/heads/feature/python-api`.
 
@@ -97,3 +108,5 @@ Items 1–4 below: plan part E.
   old command's results (`src/webServer.h:498-527`). Check on hardware: `walk()` then `stop()`.
 - [x] **Codex review fixes** (Part G, 2026-11-03): serial write pacing, the Wi-Fi retry limited to overlap errors,
   `G`/`Z`/`P`/`k` echoes, and Quaddle-aware smoke tests.
+- [x] **Quaddle hardware fixes** (Part H, 2026-11-05, `docs/superpowers/plans/2026-11-05-python-api-quaddle-hardware-fixes.md`):
+  split long serial writes, wait out S3 melodies, and hardware-test safety (fall watcher, `PETOI_ON_STAND`, no speed 0).
