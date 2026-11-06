@@ -39,3 +39,14 @@ def test_after_trouble_only_rest_is_sent():
     assert r.transport.written == []
     r.rest()
     assert r.transport.written == [b"d\n"]
+
+
+def test_rest_still_goes_out_when_more_trouble_is_buffered():
+    r = Robot(FakeStream(), timeout=0.2)
+    safety.watch(r)
+    r.transport.pending += ["EXCEPTION: Fall over", "EXCEPTION: Roll left", "EXCEPTION: Knocked"]
+    with pytest.raises(safety.RobotInTrouble):
+        r.stand()
+    r.rest()
+    assert r.transport.written == [b"d\n"]
+    assert safety.trouble[0] == "EXCEPTION: Fall over"

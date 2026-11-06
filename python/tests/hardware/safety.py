@@ -35,8 +35,10 @@ def watch(robot):
 
     def check(line):
         if line is not None and line.strip().startswith(STOP_LINES):
+            first = not trouble
             trouble.append(line.strip())
-            raise RobotInTrouble(f"robot printed {line.strip()!r}")
+            if first:  # later lines only get recorded, so the emergency rest can still go out
+                raise RobotInTrouble(f"robot printed {line.strip()!r}")
         return line
 
     def watched_readline(timeout):
