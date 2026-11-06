@@ -13,22 +13,47 @@ STOP_LINES = (
     "EXCEPTION: Pushed",
     "Trigger released",
 )
+_REST = b"d\n"
 trouble = []  # lines seen; stop_on_trouble ends the run when this isn't empty
+robots = []  # watched robots, put to rest before the run ends
+
+
+class RobotInTrouble(Exception):
+    """The robot printed a STOP_LINES message; nothing but rest is sent after it."""
 
 
 def watch(robot):
-    """Record any STOP_LINES the robot prints. USB, Bluetooth and BLE; Wi-Fi replies don't pass through readline."""
-    readline = getattr(robot.transport, "readline", None)
+    """Raise RobotInTrouble on any STOP_LINES line, then refuse every command but rest.
+
+    USB, Bluetooth and BLE; Wi-Fi replies don't pass through readline. While watched,
+    each discard of buffered input first reads what is buffered (up to 50 ms on serial)."""
+    t = robot.transport
+    readline = getattr(t, "readline", None)
     if readline is None:
         return
+    discard, write_command = t.discard_input, t.write_command
 
-    def watched(timeout):
-        line = readline(timeout)
+    def check(line):
         if line is not None and line.strip().startswith(STOP_LINES):
             trouble.append(line.strip())
+            raise RobotInTrouble(f"robot printed {line.strip()!r}")
         return line
 
-    robot.transport.readline = watched
+    def watched_readline(timeout):
+        return check(readline(timeout))
+
+    def watched_discard():
+        while check(readline(0)) is not None:  # command() discards before writing; a fall line may be waiting
+            pass
+        discard()
+
+    def guarded_write(payload):
+        if trouble and payload != _REST:
+            raise RobotInTrouble(f"not sending {payload[:20]!r}: robot printed {trouble[0]!r}")
+        write_command(payload)
+
+    t.readline, t.discard_input, t.write_command = watched_readline, watched_discard, guarded_write
+    robots.append(robot)
 
 
 # Import this into each hardware test module. It isn't in a tests/hardware/conftest.py because a second
@@ -37,6 +62,11 @@ def watch(robot):
 def stop_on_trouble():
     yield
     if trouble:
+        for robot in robots:
+            try:
+                robot.rest()
+            except Exception:
+                pass
         pytest.exit(f"robot printed {trouble[0]!r}; check it is upright and on a stand before running again", returncode=1)
 
 
