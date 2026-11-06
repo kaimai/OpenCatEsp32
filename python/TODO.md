@@ -38,6 +38,8 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
 - [ ] **Run hardware tests with the robot on a stand** (`PETOI_ON_STAND=1` for uploads). On 2026-11-05 the robot fell
   several times and couldn't get up while probe scripts drove it free-standing (speed-0 and misaligned uploads).
   `tests/hardware/safety.py` now ends the run on a fall, push, knock or `Trigger released` line (USB, Bluetooth, BLE).
+  Floor run with it on Quaddle USB, 2026-11-05: 21 passed, robot stayed up. Its read-ahead (up to 50 ms per write)
+  adds about 0.1 s to the printed skill times, so compare timings from runs with and without it carefully.
 - [ ] **`WRITE_GAP` (50 ms, Part G)**: passed on Quaddle USB (2026-11-05, run on its own). Still to run on Bluetooth:
   `pytest tests/hardware -k stop_right_after -s`. If the robot keeps walking, the gap is too short. Also try `wait=False` bursts during a melody, which pacing can't fix (the firmware isn't reading then:
   `OpenCatEsp32.ino:86-89`).
