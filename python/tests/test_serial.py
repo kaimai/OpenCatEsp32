@@ -128,3 +128,49 @@ def test_setup_wifi_reads_through_the_reboot_over_loopback():
         assert robot.setup_wifi("Home", "pw-12345", timeout=3) == "192.168.1.23"
     finally:
         timer.cancel()
+
+
+class _RecordingPort:
+    in_waiting = 0
+
+    def __init__(self):
+        self.writes = []
+
+    def write(self, data):
+        self.writes.append(bytes(data))
+
+    def flush(self):
+        pass
+
+    def read(self, n):
+        return b""
+
+    def reset_input_buffer(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def test_long_write_sends_its_start_alone_then_pauses(monkeypatch):
+    import petoi.transports.serial as serial_transport
+
+    slept = []
+    monkeypatch.setattr(serial_transport.time, "sleep", slept.append)
+    port = _RecordingPort()
+    t = SerialTransport(port, boot_timeout=0)
+    payload = bytes(range(1, 101)) + b"~"
+    t.write(payload)
+    assert port.writes == [payload[:64], payload[64:]]
+    assert slept == [serial_transport.CHUNK_PAUSE]
+
+
+def test_short_write_goes_out_whole(monkeypatch):
+    import petoi.transports.serial as serial_transport
+
+    slept = []
+    monkeypatch.setattr(serial_transport.time, "sleep", slept.append)
+    port = _RecordingPort()
+    t = SerialTransport(port, boot_timeout=0)
+    t.write(b"kup\n")
+    assert port.writes == [b"kup\n"] and slept == []

@@ -18,6 +18,14 @@ QUIET_SECONDS = 1.5  # no output this long means the robot was already booted
 
 READ_SLICE = 0.05  # port read timeout; readline() loops over slices
 
+# A long command that reaches the board while the firmware isn't reading can lose bytes and
+# misalign skill frames. Sending its start alone lets read_serial() begin; it then reads until
+# 200 ms of silence (OpenCatEsp32S3 moduleManager.h:961-1010). Quaddle Q_261027 over USB,
+# 2026-11-05, 124-frame uploads: one write failed 1 in 3, 20-byte slices 1 ms apart 1 in 3,
+# this split 20 of 20 ok. The cause is unverified.
+FIRST_CHUNK = 64
+CHUNK_PAUSE = 0.05
+
 
 class SerialTransport(StreamTransport):
     """USB cable, or a paired Bluetooth Classic (_SSP) port."""
@@ -65,8 +73,12 @@ class SerialTransport(StreamTransport):
 
     def write(self, data: bytes) -> None:
         try:
-            self._port.write(data)
+            self._port.write(data[:FIRST_CHUNK])
             self._port.flush()
+            if len(data) > FIRST_CHUNK:
+                time.sleep(CHUNK_PAUSE)
+                self._port.write(data[FIRST_CHUNK:])
+                self._port.flush()
         except serial.SerialException as e:
             raise ConnectionFailed(f"lost connection to {self._name()}: {e}") from e
 
