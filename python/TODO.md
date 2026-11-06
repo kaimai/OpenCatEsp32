@@ -62,6 +62,14 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   | `opencat` / `OpenCat` | taken: unrelated desktop-cat app, v0.2.1 (github.com/Jacobzwj/opencat) |
   | `open-cat` | free on lookup, but likely refused as too close to `opencat` (unverified) |
 - [ ] **Branch:** merge locally, open a PR, keep, or discard. Hardware testing first is the safer order.
+- [ ] **Firmware (S3): macOS keeps the BLE link after an app disconnects.** 2026-11-05/06, Quaddle Q_261027: after a clean
+  `petoi` connect and close (process exited), macOS still listed the robot as connected for 60+ s and it stopped
+  advertising, so later scans found nothing (1 of 10 connects by scan, 0 of 10 by address). Likely cause (source
+  reading, not tested by switching it off): the S3 firmware always attaches its BLE HID mouse service to the UART
+  server (OpenCatEsp32S3 `petoiBleUartNimble.h:447`, `mouse.h:71-82`; the PnP ID `0xE502`/`0xA111` is what macOS
+  shows), so macOS treats the robot as a mouse and holds it. Fix in firmware: attach HID only in mouse mode. Until
+  then: disconnect the robot in the macOS Bluetooth panel before reconnecting. Part I (abandoned-connect cleanup in
+  `BleTransport`) is a separate, smaller bug and is fixed.
 - [ ] **Firmware: larger serial receive buffer.** `Serial.setRxBufferSize()` before `Serial.begin()` in OpenCatEsp32 and
   OpenCatEsp32S3 would stop long commands losing bytes for every client, not only `petoi` (Part H). The buffer size on
   current builds wasn't checked.
