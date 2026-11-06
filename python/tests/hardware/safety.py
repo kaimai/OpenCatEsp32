@@ -25,13 +25,14 @@ class RobotInTrouble(Exception):
 def watch(robot):
     """Raise RobotInTrouble on any STOP_LINES line, then refuse every command but rest.
 
-    USB, Bluetooth and BLE; Wi-Fi replies don't pass through readline. While watched,
-    each discard of buffered input first reads what is buffered (up to 50 ms on serial)."""
+    USB, Bluetooth and BLE; Wi-Fi replies don't pass through readline. While watched, each
+    write but rest and each discard first read what is buffered (up to 50 ms on serial)."""
     t = robot.transport
     readline = getattr(t, "readline", None)
     if readline is None:
         return
     discard, write_command = t.discard_input, t.write_command
+    held = []  # lines read ahead of a write, handed back in order
 
     def check(line):
         if line is not None and line.strip().startswith(STOP_LINES):
@@ -42,14 +43,22 @@ def watch(robot):
         return line
 
     def watched_readline(timeout):
-        return check(readline(timeout))
+        return held.pop(0) if held else check(readline(timeout))
 
     def watched_discard():
+        held.clear()  # already checked
         while check(readline(0)) is not None:  # command() discards before writing; a fall line may be waiting
             pass
         discard()
 
     def guarded_write(payload):
+        if payload != _REST:
+            # with an echo owed, command() writes without discarding, so look at what's buffered first
+            while True:
+                line = check(readline(0))
+                if line is None:
+                    break
+                held.append(line)
         if trouble and payload != _REST:
             raise RobotInTrouble(f"not sending {payload[:20]!r}: robot printed {trouble[0]!r}")
         write_command(payload)

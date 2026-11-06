@@ -50,3 +50,21 @@ def test_rest_still_goes_out_when_more_trouble_is_buffered():
     r.rest()
     assert r.transport.written == [b"d\n"]
     assert safety.trouble[0] == "EXCEPTION: Fall over"
+
+
+def test_buffered_fall_blocks_the_next_move_even_while_an_echo_is_owed():
+    r = Robot(FakeStream(auto_echo=False), timeout=0.2)
+    safety.watch(r)
+    r.walk(wait=False)  # its echo is owed, so command() won't discard input before the next write
+    r.transport.pending.append("EXCEPTION: Fall over")
+    with pytest.raises(safety.RobotInTrouble):
+        r.stop()
+    assert r.transport.written == [b"kwkF\n"]
+
+
+def test_lines_read_ahead_of_a_write_are_kept_for_the_reply():
+    r = Robot(FakeStream(), timeout=0.2)
+    safety.watch(r)
+    r.transport.pending.append("k")
+    r.transport.write_command(b"kup\n")
+    assert r.transport.readline(0) == "k"
