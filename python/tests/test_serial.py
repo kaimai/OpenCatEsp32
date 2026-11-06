@@ -152,17 +152,39 @@ class _RecordingPort:
         pass
 
 
-def test_long_write_sends_its_start_alone_then_pauses(monkeypatch):
+@pytest.mark.parametrize("token", [b"K", b"b", b"B"])
+def test_long_write_sends_its_start_alone_then_pauses(monkeypatch, token):
     import petoi.transports.serial as serial_transport
 
     slept = []
     monkeypatch.setattr(serial_transport.time, "sleep", slept.append)
     port = _RecordingPort()
     t = SerialTransport(port, boot_timeout=0)
-    payload = bytes(range(1, 101)) + b"~"
+    payload = token + bytes(range(1, 100)) + b"~"
     t.write(payload)
     assert port.writes == [payload[:64], payload[64:]]
     assert slept == [serial_transport.CHUNK_PAUSE]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        ("i " + " ".join(f"{j} 30" for j in range(16)) + "\n").encode(),  # 87 bytes
+        b"w" + b"x" * 80 + b"\n",  # e.g. Wi-Fi credentials
+    ],
+)
+def test_long_command_with_the_short_receive_timeout_goes_out_whole(monkeypatch, payload):
+    # Only K and b/B get the firmware's 200 ms receive timeout; others end after 10 ms of silence
+    # (src/OpenCat.h:68-69, src/moduleManager.h:402; OpenCatEsp32S3 moduleManager.h:961)
+    import petoi.transports.serial as serial_transport
+
+    slept = []
+    monkeypatch.setattr(serial_transport.time, "sleep", slept.append)
+    port = _RecordingPort()
+    t = SerialTransport(port, boot_timeout=0)
+    assert len(payload) > serial_transport.FIRST_CHUNK
+    t.write(payload)
+    assert port.writes == [payload] and slept == []
 
 
 def test_short_write_goes_out_whole(monkeypatch):

@@ -23,8 +23,11 @@ READ_SLICE = 0.05  # port read timeout; readline() loops over slices
 # 200 ms of silence (OpenCatEsp32S3 moduleManager.h:961-1010). Quaddle Q_261027 over USB,
 # 2026-11-05, 124-frame uploads: one write failed 1 in 3, 20-byte slices 1 ms apart 1 in 3,
 # this split 20 of 20 ok. The cause is unverified.
+# Only K and b/B get that 200 ms; every other command ends after 10 ms of silence, so a pause
+# would cut it in two (src/OpenCat.h:68-69, src/moduleManager.h:402; S3 moduleManager.h:961).
 FIRST_CHUNK = 64
 CHUNK_PAUSE = 0.05
+_LONG_TIMEOUT_TOKENS = (b"K", b"b", b"B")
 
 
 class SerialTransport(StreamTransport):
@@ -73,12 +76,13 @@ class SerialTransport(StreamTransport):
 
     def write(self, data: bytes) -> None:
         try:
-            self._port.write(data[:FIRST_CHUNK])
-            self._port.flush()
-            if len(data) > FIRST_CHUNK:
-                time.sleep(CHUNK_PAUSE)
-                self._port.write(data[FIRST_CHUNK:])
+            if len(data) > FIRST_CHUNK and data[:1] in _LONG_TIMEOUT_TOKENS:
+                self._port.write(data[:FIRST_CHUNK])
                 self._port.flush()
+                time.sleep(CHUNK_PAUSE)
+                data = data[FIRST_CHUNK:]
+            self._port.write(data)
+            self._port.flush()
         except serial.SerialException as e:
             raise ConnectionFailed(f"lost connection to {self._name()}: {e}") from e
 
