@@ -96,3 +96,38 @@ def test_no_answer_to_question_mark_fails_to_connect(monkeypatch):
     t = settling(monkeypatch, lambda t, data: None)
     with pytest.raises(ConnectionFailed, match="did not answer"):
         t._settle()
+
+
+class HangingClient:
+    """A bleak client whose connect() never finishes, like a robot macOS is slow to reach."""
+
+    made = []
+
+    def __init__(self, address):
+        self.disconnects = 0
+        self.cancelled = False
+        HangingClient.made.append(self)
+
+    async def connect(self):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+    async def disconnect(self):
+        self.disconnects += 1
+
+
+def test_abandoned_connect_is_cancelled_and_disconnected(monkeypatch):
+    import sys
+    import types
+
+    monkeypatch.setattr(ble, "RUN_TIMEOUT", 0.1)
+    monkeypatch.setitem(sys.modules, "bleak", types.SimpleNamespace(BleakClient=HangingClient))
+    HangingClient.made.clear()
+    with pytest.raises(ConnectionFailed, match="did not respond"):
+        BleTransport("AA:BB")
+    client = HangingClient.made[0]
+    assert client.disconnects == 1  # tells the OS to stop connecting
+    assert client.cancelled  # the connect task ran its cancellation before the loop stopped

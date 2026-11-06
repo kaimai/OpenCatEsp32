@@ -66,7 +66,7 @@ class BleTransport(StreamTransport):
             return CHUNK
 
     def _cleanup(self) -> None:
-        if self._connected:
+        if self._client is not None:  # also after a failed or abandoned connect, so the OS stops trying
             try:
                 self._run(self._client.disconnect())
             except Exception:
@@ -159,6 +159,18 @@ class BleTransport(StreamTransport):
     def _shutdown_loop(self) -> None:
         if self._loop.is_closed():
             return
+
+        async def finish_tasks():  # let a cancelled connect clean up instead of being destroyed pending
+            tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+            for t in tasks:
+                t.cancel()
+            if tasks:
+                await asyncio.wait(tasks, timeout=2)
+
+        try:
+            asyncio.run_coroutine_threadsafe(finish_tasks(), self._loop).result(timeout=3)
+        except Exception:
+            pass
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=2)
         if not self._thread.is_alive():
