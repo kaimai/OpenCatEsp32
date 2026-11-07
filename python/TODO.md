@@ -62,14 +62,19 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   | `opencat` / `OpenCat` | taken: unrelated desktop-cat app, v0.2.1 (github.com/Jacobzwj/opencat) |
   | `open-cat` | free on lookup, but likely refused as too close to `opencat` (unverified) |
 - [ ] **Branch:** merge locally, open a PR, keep, or discard. Hardware testing first is the safer order.
-- [ ] **Firmware (S3): macOS keeps the BLE link after an app disconnects.** 2026-11-05/06, Quaddle Q_261027: after a clean
-  `petoi` connect and close (process exited), macOS still listed the robot as connected for 60+ s and it stopped
-  advertising, so later scans found nothing (1 of 10 connects by scan, 0 of 10 by address). Likely cause (source
-  reading, not tested by switching it off): the S3 firmware always attaches its BLE HID mouse service to the UART
-  server (OpenCatEsp32S3 `petoiBleUartNimble.h:447`, `mouse.h:71-82`; the PnP ID `0xE502`/`0xA111` is what macOS
-  shows), so macOS treats the robot as a mouse and holds it. Fix in firmware: attach HID only in mouse mode. Until
-  then: disconnect the robot in the macOS Bluetooth panel before reconnecting. Part I (abandoned-connect cleanup in
-  `BleTransport`) is a separate, smaller bug and is fixed.
+- [ ] **Firmware (S3): macOS takes over the BLE link as a mouse.** The S3 firmware always attaches its BLE HID mouse
+  service to the UART server, even with mouse mode off (OpenCatEsp32S3 `petoiBleUartNimble.h:447`, `mouse.h:71-82`;
+  mouse mode is `XO`/`Xo`, `OpenCat.h:760-761`, and is cleared at boot, `configConstants.h:792-796`).
+  Seen 2026-11-06 on Quaddle Q_261027, macOS, mouse mode off, robot's USB log recorded during one plain bleak connect
+  (UART service only) and disconnect: the robot logged `[BLE] client connected`, our disconnect returned at 7.7 s, the
+  robot never logged a disconnect, and at 10.6 s it logged `BLE mouse subscribed`. macOS then listed it as connected
+  (Vendor `0xE502`, Product `0xA111`, the HID PnP ID) for as long as we watched (90 s in an earlier run), and it stopped
+  advertising, so scans found nothing. Not every connect ends this way: 4 plain connects earlier that day left it free;
+  why is not known. After Part J, `ble_compare.py` got 1 of 10 by scan and 0 of 10 by address for this reason.
+  Separately, discovering the Device Information service (180A, which the HID code adds) stalls 30 s on macOS; Part J
+  avoids it by discovering only the UART service (connect in 0.9 s). Whether the two are related is not known.
+  Fix in firmware: attach the HID service only in mouse mode. Until then: disconnect the robot in the macOS Bluetooth
+  panel (or restart it) before each connect. Part I (abandoned-connect cleanup in `BleTransport`) is fixed.
 - [ ] **Firmware: larger serial receive buffer.** `Serial.setRxBufferSize()` before `Serial.begin()` in OpenCatEsp32 and
   OpenCatEsp32S3 would stop long commands losing bytes for every client, not only `petoi` (Part H). The buffer size on
   current builds wasn't checked.
