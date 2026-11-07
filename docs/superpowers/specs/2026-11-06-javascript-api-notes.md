@@ -90,7 +90,7 @@ The judgments below are mine, applying those sources; they are not quoted from t
 6. **Mixed failure styles.** High-level methods raise `RobotTimeout`; `send()` returns a `Reply` with `completed=False`. Deliberate and documented (raw access never raises), so keep it, and keep it the same in JavaScript.
 7. **Internals exposed.** `robot.transport` is public, and `model` / `firmware` are writable attributes set by `connect()`. Low risk; read-only properties would be cleaner.
 
-Items 1-3 are worth fixing in Python before the JavaScript port copies them. Each would need its own small plan.
+Items 1-3 were fixed in Python before the port (Part K, `docs/superpowers/plans/2026-11-06-python-api-design-fixes.md`): keyword-only settings 4e65f56, DEBUG traffic logging with Wi-Fi setup hidden a0af3fe, refusing a `Skill` the model lacks d8969c9. Items 4-7 are left as they are.
 
 ### What this means for the JavaScript API
 
