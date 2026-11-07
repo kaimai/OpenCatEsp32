@@ -7,6 +7,7 @@ Working notes for the JavaScript port of the `petoi` Python package. Not a desig
 - The JavaScript API lives in a folder next to `python/` on `feature/python-api`.
 - PetoiWebCoding should switch to it.
 - The remaining Python TODOs (`python/TODO.md`) go to the team.
+- **Delivery (2026-11-07):** one ready-built file, loaded with `<script src="petoi.js">`, which adds a global `Petoi`; the same build also ships as an ES module (`petoi.mjs`). The built files are committed. Whether to also publish to npm is left open; PetoiWebCoding doesn't need it.
 
 ## Recommended, not yet confirmed
 
@@ -50,7 +51,7 @@ This repo also has `PetoiWebCodingBlocks/`, an older copy of the same app (`main
 
 ## Open questions (one at a time)
 
-1. **How should PetoiWebCoding load the API?** It has no build step today.
+1. **How should PetoiWebCoding load the API?** It has no build step today. *Answered 2026-11-07: A.*
    - **A. One ready-built file** loaded with `<script src="petoi.js">`, which adds a global `Petoi` (recommended). Fits PetoiWebCoding as it is. We write TypeScript and commit the built file. It also works as an ES module (`import { connect } from "./petoi.mjs"`) for newer pages.
    - **B. ES module only** (`<script type="module">`). Cleaner for modern code, but each PetoiWebCoding page would need changing to use it.
    - **C. An npm package** installed into their committed `node_modules/`. Most standard, but needs publishing to npm, and they would still load a built file.
