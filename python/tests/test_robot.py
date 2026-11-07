@@ -787,3 +787,28 @@ def test_nothing_from_wifi_setup_is_logged(caplog):
     wifi_robot([JOINED, "Rebooting to use web server.", JOINED, "Ready!"]).setup_wifi("Home", PW)
     assert PW not in caplog.text and "9876" not in caplog.text
     assert "Wi-Fi setup command hidden" in caplog.text  # still shows that something was sent
+
+
+def quaddle():
+    r = robot()
+    r.model = "Quaddle"
+    return r
+
+
+def test_skill_the_model_lacks_is_refused():
+    with pytest.raises(ValueError, match="'clap' is not a Quaddle skill"):
+        quaddle().skill(Skill.CLAP)
+    with pytest.raises(ValueError, match="send"):
+        quaddle().skill("clap")  # the value of a Skill member counts too
+
+
+def test_names_outside_skill_still_go_through():
+    r = quaddle()
+    r.skill("wkF")  # Quaddle's own skills aren't all in Skill
+    assert r.transport.written[-1] == b"kwkF\n"
+
+
+def test_unknown_model_checks_nothing():
+    r = robot()  # model None: connect() couldn't read it
+    r.skill(Skill.CLAP)
+    assert r.transport.written[-1] == b"kclap\n"

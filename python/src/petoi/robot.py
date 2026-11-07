@@ -8,7 +8,7 @@ import warnings
 from typing import Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 from petoi._timing import DOF, skill_seconds
-from petoi.constants import Joint, Skill, is_s3_firmware, model_key
+from petoi.constants import Joint, Skill, is_s3_firmware, model_key, skills_for
 from petoi.errors import RobotError, RobotTimeout, WifiSetupFailed
 from petoi.protocol import Reply, encode, parse_ints
 from petoi.transports.base import StreamTransport, Transport
@@ -94,7 +94,15 @@ class Robot:
     # --- postures and skills ----------------------------------------------
 
     def skill(self, name: Union[Skill, str], *, wait: bool = True, timeout: Optional[float] = None) -> Reply:
-        """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes (up to skill_timeout)."""
+        """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes (up to skill_timeout).
+
+        Raises ValueError for a Skill this model's firmware doesn't have (known after connect())."""
+        key = model_key(self.model)
+        if key is not None:
+            member = name if isinstance(name, Skill) else next((s for s in Skill if s.value == name), None)
+            if member is not None and member not in skills_for(key):
+                # it would confirm at once without moving (Quaddle, 2026-11-06)
+                raise ValueError(f"{member.value!r} is not a {self.model} skill; send('k{member.value}') sends it anyway")
         return self._cmd("k", name, wait=wait, timeout=self.skill_timeout if timeout is None else timeout)
 
     def _skill_layout(self) -> Tuple[int, Tuple[int, ...], int]:
