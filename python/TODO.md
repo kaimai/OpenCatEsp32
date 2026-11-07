@@ -35,8 +35,10 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   `pee` 2.4, `scrh` 1.8, `hsk` 1.7, `hds` 3.2, `kc` 1.0, `nd` 1.3, `wh` 1.3, `dropRec` 0.4. A single `b` with three
   notes plays all three (heard), but echoes after 0.07 s. Done 2026-11-06 (below): USB and BLE
   suites, uploads on a stand, the BLE handshake, and on USB the interactive leg order, `z0` keeping it still for 10 s,
-  and three notes heard (all answered yes by the owner). Still open: Wi-Fi, the `?` retry on a sleeping robot,
-  Scout's head pan at index 0 (`PETOI_SCOUT=1`), and `setup_wifi()` without a reboot. The USB link dropped
+  and three notes heard (all answered yes by the owner). Wi-Fi the same day: `setup_wifi()` joined without a
+  reboot and the same USB link kept working; the floor suite over Wi-Fi passed 26, failed 1 (the S3 Wi-Fi joint-angle
+  firmware item below). Still open: the `?` retry on a sleeping robot, Scout's head pan at index 0 (`PETOI_SCOUT=1`),
+  uploads over Wi-Fi on a stand, and the wrong-password test (needs the robot off Wi-Fi). The USB link dropped
   out several times that day before it stayed up; a cable or hub problem is likely but unconfirmed.
   2026-11-06, newest S3 main (06502f4, reports `Q_261103`), floor runs with the watcher, uploads skipped: USB 27 passed;
   BLE 26 passed (the USB-only gyro line test skips). Skill times on both within 0.1 s of each other and within 0.6 s of
@@ -89,6 +91,14 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   subscribes as a mouse, and `ble_compare.py` through `petoi` got 10 of 10 by scan (8.8 s avg, 5 s of it the scan)
   and 10 of 10 by address (3.7 s avg). `petoi.connect("ble")` on older S3 builds still hits the takeover. The HID
   service is still attached at `petoiBleUartNimble.h:473`, so why this fixes it is not known.
+- [ ] **Firmware (S3): joint angles read 0 after a skill sent over Wi-Fi.** 2026-11-06, Quaddle, newest S3 main, robot at
+  192.168.1.130. Over Wi-Fi, `stand()` (`kup`, reply `up`), then `joints()` every 0.3-0.5 s: the first read is right
+  (`0, 85, 5, 5, 20, 20`), every read from about 0.4 s on is `0, 0, 0, 0, 0, 0`, while the robot stands firmly (owner
+  checked). USB then reads zeros too, until a `kup` sent over USB, after which USB reads `0, 85, 5, 5, 20, 20` again.
+  Same with `walk(wait=False)` + `stop()`. The same sequence over USB or BLE reads correctly. Idle reads over Wi-Fi
+  after a USB `rest` were right (4 of 4). This makes `test_stop_right_after_unwaited_walk_is_not_lost` fail over
+  Wi-Fi (3 of 3 runs). `petoi` sends the same `j` on every link. Cause not found: the only `currentAng[joint] = 0` in
+  the source are the auto-calibration release paths (`motion.h:1100, 1230`), which detach the servo.
 - [ ] **Firmware: larger serial receive buffer.** `Serial.setRxBufferSize()` before `Serial.begin()` in OpenCatEsp32 and
   OpenCatEsp32S3 would stop long commands losing bytes for every client, not only `petoi` (Part H). The buffer size on
   current builds wasn't checked.
