@@ -12,11 +12,11 @@ Working notes for the JavaScript port of the `petoi` Python package. Not a desig
 - **Source language (2026-11-07):** TypeScript, built into `petoi.js`, `petoi.mjs` and a types file. Node and the build are for developers only.
 - **Names (2026-11-07):** JavaScript style (`runSkillData`), with the same methods and behavior as Python (from the design research below; owner didn't object).
 - **Testing (2026-11-07):** unit tests in Node against fake Web Serial, Web Bluetooth and WebSocket objects. Protocol cases (command encoding, which reply means done, long-upload splitting) move into one shared data file that both the Python and the JavaScript tests read. Hardware tests are a separate page opened in Chrome, robot on a stand.
+- **Scope (2026-11-07):** the API only. Moving PetoiWebCoding onto it is a separate project afterwards, for its maintainers; the hardware test page doubles as a small example for them.
 
 ## Recommended, not yet confirmed
 
 - **Browser-only first version** (Web Serial, Web Bluetooth, WebSocket). PetoiWebCoding's robot code is all browser code; Node there is only dev tooling. Node support can be added later behind its own transports if someone needs it.
-- **Scope:** the API itself is one design, plan and build. Moving PetoiWebCoding onto it is a separate project afterwards: different repository and maintainers (Rongzhong Li, Jason.W), and it needs its own browser testing.
 
 ## What exists
 
@@ -61,7 +61,7 @@ This repo also has `PetoiWebCodingBlocks/`, an older copy of the same app (`main
 2. Folder name next to `python/`. *Answered 2026-11-07: `javascript/`.*
 3. How closely names follow Python (`run_skill_data` vs `runSkillData`, async everywhere). *Answered 2026-11-07: JavaScript style, same behavior.*
 4. How to test without a browser (fake Web Serial / Web Bluetooth / WebSocket objects, shared test vectors from the Python tests). *Answered 2026-11-07: fakes plus a shared case file.*
-5. Whether converting one PetoiWebCoding page is part of this project as a proof, or all of it is left to its maintainers.
+5. Whether converting one PetoiWebCoding page is part of this project as a proof, or all of it is left to its maintainers. *Answered 2026-11-07: left to them; API only.*
 
 ## API design practices, checked against the Python API (2026-11-06)
 
