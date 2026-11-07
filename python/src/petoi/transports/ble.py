@@ -12,6 +12,7 @@ from petoi.protocol import LineBuffer
 from petoi.transports.base import StreamTransport
 
 # Nordic UART, src/bleCommon.h:6-8
+UART_SERVICE = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 ROBOT_RX = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  # we write here
 ROBOT_TX = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  # robot notifies here
 NAME_MARK = "_BLE"  # src/bleUart.h:99
@@ -45,7 +46,8 @@ class BleTransport(StreamTransport):
         self._raw_lock = threading.Lock()
         try:
             address = address or self._run(self._find(scan_timeout), limit=scan_timeout + RUN_TIMEOUT)
-            self._client = bleak.BleakClient(address)
+            # only the UART: S3 firmware leaves macOS waiting 30 s on its HID Device Information service
+            self._client = bleak.BleakClient(address, services=[UART_SERVICE])
             self._run(self._client.connect())
             self._connected = True
             self._run(self._client.start_notify(ROBOT_TX, self._on_notify))

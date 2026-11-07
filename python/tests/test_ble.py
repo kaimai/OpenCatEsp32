@@ -103,7 +103,7 @@ class HangingClient:
 
     made = []
 
-    def __init__(self, address):
+    def __init__(self, address, **kwargs):
         self.disconnects = 0
         self.cancelled = False
         HangingClient.made.append(self)
@@ -131,3 +131,31 @@ def test_abandoned_connect_is_cancelled_and_disconnected(monkeypatch):
     client = HangingClient.made[0]
     assert client.disconnects == 1  # tells the OS to stop connecting
     assert client.cancelled  # the connect task ran its cancellation before the loop stopped
+
+
+class RecordingClient:
+    """A bleak client that records how it was made and fails to connect, ending __init__ early."""
+
+    made = []
+
+    def __init__(self, address, **kwargs):
+        self.kwargs = kwargs
+        RecordingClient.made.append(self)
+
+    async def connect(self):
+        raise OSError("no robot here")
+
+    async def disconnect(self):
+        pass
+
+
+def test_discovers_only_the_uart_service(monkeypatch):
+    import sys
+    import types
+
+    monkeypatch.setitem(sys.modules, "bleak", types.SimpleNamespace(BleakClient=RecordingClient))
+    RecordingClient.made.clear()
+    with pytest.raises(ConnectionFailed):
+        BleTransport("AA:BB")
+    # S3 firmware stalls discovery of its HID Device Information service for 30 s (Part J)
+    assert RecordingClient.made[0].kwargs["services"] == [ble.UART_SERVICE]
