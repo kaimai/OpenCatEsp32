@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import threading
 
 import pytest
@@ -173,3 +174,12 @@ def test_non_dict_hello_is_rejected_and_connection_closed():
         time.sleep(0.05)
     assert seen.get("closed") == "ConnectionClosedOK"
     srv.shutdown()
+
+
+def test_wifi_traffic_is_logged_at_debug(port, caplog):
+    caplog.set_level(logging.DEBUG, logger="petoi")
+    t = WebSocketTransport("127.0.0.1", port=port, heartbeat=False)
+    t.command("?", b"?\n", timeout=2.0)
+    t.close()
+    assert "-> ?" in caplog.text
+    assert "Bittle X" in caplog.text

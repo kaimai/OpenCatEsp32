@@ -269,7 +269,7 @@ class Robot:
         with self._lock:
             transport.discard_input()
             transport._unconfirmed.clear()  # OpenCatEsp32 reboots; nothing sent earlier will echo now
-            transport.write_command(payload)
+            transport.write_command(payload, secret=True)
             deadline = time.monotonic() + timeout  # counted from sending, not from waiting for the lock
             # Never keep or show robot lines: they include the password's last 4 characters (src/reaction.h:449-458).
             for line in _lines(transport, deadline):

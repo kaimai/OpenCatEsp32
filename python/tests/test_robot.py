@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 
@@ -772,3 +773,17 @@ def test_optional_settings_are_keyword_only(call):
 def test_robot_timeouts_are_keyword_only():
     with pytest.raises(TypeError):
         Robot(FakeStream(), 5.0)
+
+
+def test_traffic_is_logged_at_debug(caplog):
+    caplog.set_level(logging.DEBUG, logger="petoi")
+    robot().sit()
+    assert "-> b'ksit\\n'" in caplog.text
+    assert "<- k" in caplog.text
+
+
+def test_nothing_from_wifi_setup_is_logged(caplog):
+    caplog.set_level(logging.DEBUG, logger="petoi")
+    wifi_robot([JOINED, "Rebooting to use web server.", JOINED, "Ready!"]).setup_wifi("Home", PW)
+    assert PW not in caplog.text and "9876" not in caplog.text
+    assert "Wi-Fi setup command hidden" in caplog.text  # still shows that something was sent

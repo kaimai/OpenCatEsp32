@@ -4,6 +4,7 @@ import base64
 import inspect
 import itertools
 import json
+import logging
 import queue
 import re
 import threading
@@ -13,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from petoi.errors import ConnectionFailed, RobotError
 from petoi.protocol import Reply, collect_reply
 from petoi.transports.base import Transport
+
+log = logging.getLogger("petoi")
 
 PORT = 81  # src/webServer.h:59
 HEARTBEAT_SECONDS = 15  # firmware drops clients after 40 s of silence (src/webServer.h:51)
@@ -123,6 +126,7 @@ class WebSocketTransport(Transport):
         # so Wi-Fi commands always wait for completion.
         deadline = time.monotonic() + (timeout or self._default_timeout)
         task_id = f"py-{next(self._ids)}"
+        log.debug("-> %s", to_web_command(payload))
         try:
             self._ws.send(json.dumps({"type": "command", "taskId": task_id, "commands": [to_web_command(payload)]}))
         except self._closed_errors as e:
@@ -154,6 +158,7 @@ class WebSocketTransport(Transport):
                 self._outstanding.remove(task_id)
                 raise RobotError(msg.get("error", "command failed"))
             if status == "completed":
+                log.debug("<- %s", "".join(msg.get("results", [])).strip())
                 # status "completed" is Wi-Fi's real completion signal, so add the echo in case results omit it
                 lines = iter("".join(msg.get("results", [])).splitlines() + [token])
                 return collect_reply(token, lambda: next(lines, None))

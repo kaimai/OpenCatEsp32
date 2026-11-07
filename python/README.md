@@ -226,6 +226,7 @@ Exit codes: 0 means the robot confirmed the command, 1 means a failure or no rep
 - **Wi-Fi**: the robot accepts at most 2 clients at once. Not on Wi-Fi yet? See "Putting the robot on Wi-Fi".
 - **Firmware warning**: update the firmware with the Petoi Desktop App (see "Old firmware" above).
 - **Robot keeps moving after your script ended**: send `robot.stop()` or `robot.rest()`. The `with` block does this for you if an error ends the script.
+- **Seeing what is sent and received**: `import logging; logging.basicConfig(level=logging.DEBUG)` logs every command (`->`) and reply line (`<-`) on the `petoi` logger. `setup_wifi()` shows only "(Wi-Fi setup command hidden)", and none of the robot's replies to it, because they include part of the password.
 
 ## Known limitations
 

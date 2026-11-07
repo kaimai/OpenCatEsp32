@@ -51,7 +51,7 @@ def watch(robot):
             pass
         discard()
 
-    def guarded_write(payload):
+    def guarded_write(payload, **kw):
         if payload != _REST:
             # with an echo owed, command() writes without discarding, so look at what's buffered first
             while True:
@@ -61,7 +61,7 @@ def watch(robot):
                 held.append(line)
         if trouble and payload != _REST:
             raise RobotInTrouble(f"not sending {payload[:20]!r}: robot printed {trouble[0]!r}")
-        write_command(payload)
+        write_command(payload, **kw)
 
     t.readline, t.discard_input, t.write_command = watched_readline, watched_discard, guarded_write
     robots.append(robot)

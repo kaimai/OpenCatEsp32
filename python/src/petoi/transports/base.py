@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
 from petoi.protocol import Reply, collect_reply, echoes
+
+log = logging.getLogger("petoi")
 
 
 STALE_SECONDS = 15.0  # longest one-shot skill we expect to take before it echoes
@@ -52,12 +55,15 @@ class StreamTransport(Transport):
     WRITE_GAP = 0.05
     _owed_write_at = 0.0  # when the last unconfirmed command was written; 0 once confirmed
 
-    def write_command(self, payload: bytes) -> None:
-        """Write one command, first waiting out WRITE_GAP if the previous one is unconfirmed."""
+    def write_command(self, payload: bytes, *, secret: bool = False) -> None:
+        """Write one command, first waiting out WRITE_GAP if the previous one is unconfirmed.
+
+        secret: log that a command went out, but not its bytes (Wi-Fi setup carries the password)."""
         if self._owed_write_at:
             wait = self._owed_write_at + self.WRITE_GAP - time.monotonic()
             if wait > 0:
                 time.sleep(wait)
+        log.debug("-> %s", "(Wi-Fi setup command hidden)" if secret else payload)
         self.write(payload)
         self._owed_write_at = time.monotonic()
 
@@ -92,6 +98,7 @@ class StreamTransport(Transport):
                     return None
                 line = self.readline(remaining)
                 if line is not None:
+                    log.debug("<- %s", line)
                     hit = next((i for i, (t, _) in enumerate(pending) if line.strip() in echoes(t)), None)
                     if hit is not None:
                         # a late echo; earlier entries ahead of it were lost
