@@ -16,7 +16,7 @@ pytestmark = [
 
 
 def test_wrong_password_fails_without_leaking_it():  # runs first: once joined, the robot ignores new details
-    bad = "petoi-wrong-password"
+    bad = "petoi-wrong-pw-7319"  # its last 4 characters must not occur in the error text ("password" ends in "word")
     with petoi.connect(PORT) as robot:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
