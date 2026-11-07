@@ -8,6 +8,7 @@ Working notes for the JavaScript port of the `petoi` Python package. Not a desig
 - PetoiWebCoding should switch to it.
 - The remaining Python TODOs (`python/TODO.md`) go to the team.
 - **Delivery (2026-11-07):** one ready-built file, loaded with `<script src="petoi.js">`, which adds a global `Petoi`; the same build also ships as an ES module (`petoi.mjs`). The built files are committed. Whether to also publish to npm is left open; PetoiWebCoding doesn't need it.
+- **Folder (2026-11-07):** `javascript/`, next to `python/`.
 
 ## Recommended, not yet confirmed
 
@@ -55,7 +56,7 @@ This repo also has `PetoiWebCodingBlocks/`, an older copy of the same app (`main
    - **A. One ready-built file** loaded with `<script src="petoi.js">`, which adds a global `Petoi` (recommended). Fits PetoiWebCoding as it is. We write TypeScript and commit the built file. It also works as an ES module (`import { connect } from "./petoi.mjs"`) for newer pages.
    - **B. ES module only** (`<script type="module">`). Cleaner for modern code, but each PetoiWebCoding page would need changing to use it.
    - **C. An npm package** installed into their committed `node_modules/`. Most standard, but needs publishing to npm, and they would still load a built file.
-2. Folder name next to `python/`.
+2. Folder name next to `python/`. *Answered 2026-11-07: `javascript/`.*
 3. How closely names follow Python (`run_skill_data` vs `runSkillData`, async everywhere).
 4. How to test without a browser (fake Web Serial / Web Bluetooth / WebSocket objects, shared test vectors from the Python tests).
 5. Whether converting one PetoiWebCoding page is part of this project as a proof, or all of it is left to its maintainers.
