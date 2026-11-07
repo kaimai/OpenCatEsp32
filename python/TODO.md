@@ -35,6 +35,12 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   `PETOI_ON_STAND=1`; BLE and Wi-Fi; the `?` retry on a sleeping robot, the BLE handshake, `z0` keeping it still,
   leg order, Scout's head pan at index 0 (`PETOI_SCOUT=1`), and `setup_wifi()` without a reboot. The USB link dropped
   out several times that day before it stayed up; a cable or hub problem is likely but unconfirmed.
+  2026-11-07, newest S3 main (06502f4, reports `Q_261103`), floor runs with the watcher, uploads skipped: USB 27 passed;
+  BLE 26 passed (the USB-only gyro line test skips). Skill times on both within 0.1 s of each other and within 0.6 s of
+  the 11-05 run. Two earlier USB runs on this firmware stopped on `EXCEPTION: Pushed` (`back("right")`) and
+  `EXCEPTION: Knocked` (`buttUp`); the robot stayed upright. Not seen again; cause unknown. A first run after flashing got
+  no `?` answer, so the model was unknown and the skill test sent Bittle/Nybble skills, which the robot confirmed in
+  0.3 s: `petoi` doesn't report an unknown skill name as an error.
 - [ ] **Run hardware tests with the robot on a stand** (`PETOI_ON_STAND=1` for uploads). On 2026-11-05 the robot fell
   several times and couldn't get up while probe scripts drove it free-standing (speed-0 and misaligned uploads).
   `tests/hardware/safety.py` now ends the run on a fall, push, knock or `Trigger released` line (USB, Bluetooth, BLE).
