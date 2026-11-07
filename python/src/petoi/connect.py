@@ -106,7 +106,7 @@ def _calm(robot: Robot) -> None:
         warnings.warn("the robot did not confirm 'z0'; it may move on its own when idle", RuntimeWarning, stacklevel=4)
 
 
-def connect(target: Optional[str] = None, timeout: float = 5.0, check_firmware: bool = True) -> Robot:
+def connect(target: Optional[str] = None, *, timeout: float = 5.0, check_firmware: bool = True) -> Robot:
     """Connect to a robot. target: None (USB), a port name, "bluetooth", "ble",
     "ble:<address>", a Wi-Fi address, or "mock". timeout is also the BLE scan time."""
     kind, value = classify(target)

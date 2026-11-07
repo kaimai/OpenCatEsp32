@@ -166,3 +166,8 @@ def test_question_mark_is_retried_once_for_a_sleeping_robot():
 def test_bluetooth_classic_hint_mentions_s3_robots():
     with pytest.raises(ConnectionFailed, match="Quaddle"):
         pick_serial_port([], bluetooth=True)
+
+
+def test_connect_settings_are_keyword_only():
+    with pytest.raises(TypeError):
+        petoi.connect("mock", 5.0)

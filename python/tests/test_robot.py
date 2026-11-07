@@ -742,3 +742,33 @@ def test_s3_melody_waits_the_whole_tune_even_after_a_slow_send(monkeypatch):
     r.transport.command = slow
     r.melody([(12, 4), (14, 4), (16, 2)])
     assert slept == [pytest.approx(1.0)]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda r: r.send("ksit", False),
+        lambda r: r.skill("hi", False),
+        lambda r: r.run_skill_data(POSTURE, False),
+        lambda r: r.sit(False),
+        lambda r: r.stand(False),
+        lambda r: r.stop(False),
+        lambda r: r.rest(False),
+        lambda r: r.walk("left", False),
+        lambda r: r.trot("left", False),
+        lambda r: r.crawl("left", False),
+        lambda r: r.back("left", False),
+        lambda r: r.joint(8, 30, False),
+        lambda r: r.move_joints({8: 30}, True),
+        lambda r: r.melody([(1, 8)], False),
+        lambda r: r.setup_wifi("Home", PW, 5.0),
+    ],
+)
+def test_optional_settings_are_keyword_only(call):
+    with pytest.raises(TypeError):  # robot.sit(False) doesn't say what False means
+        call(robot())
+
+
+def test_robot_timeouts_are_keyword_only():
+    with pytest.raises(TypeError):
+        Robot(FakeStream(), 5.0)

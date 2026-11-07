@@ -38,7 +38,7 @@ class Robot:
     skill() waits up to skill_timeout, since one-shot skills confirm only when finished.
     """
 
-    def __init__(self, transport: Transport, timeout: float = 5.0, skill_timeout: float = 30.0):
+    def __init__(self, transport: Transport, *, timeout: float = 5.0, skill_timeout: float = 30.0):
         self.transport = transport
         self.timeout = timeout
         self.skill_timeout = skill_timeout  # below Wi-Fi's 45 s task abort (src/webServer.h:53)
@@ -53,7 +53,7 @@ class Robot:
 
     # --- raw access -------------------------------------------------------
 
-    def send(self, command: str, wait: bool = True, timeout: Optional[float] = None) -> Reply:
+    def send(self, command: str, *, wait: bool = True, timeout: Optional[float] = None) -> Reply:
         """Send a serial-monitor style command, e.g. "ksit", "i 8 30", "d"."""
         if not command:
             raise ValueError("command is empty")
@@ -93,7 +93,7 @@ class Robot:
 
     # --- postures and skills ----------------------------------------------
 
-    def skill(self, name: Union[Skill, str], wait: bool = True, timeout: Optional[float] = None) -> Reply:
+    def skill(self, name: Union[Skill, str], *, wait: bool = True, timeout: Optional[float] = None) -> Reply:
         """Run a skill by name, e.g. Skill.HI or "hi"; waits until it finishes (up to skill_timeout)."""
         return self._cmd("k", name, wait=wait, timeout=self.skill_timeout if timeout is None else timeout)
 
@@ -106,7 +106,7 @@ class Robot:
             return DOF, (8,), _SKILL_ROOM  # WALKING_DOF (src/OpenCat.h:249-256)
         return DOF, (8, 12), _SKILL_ROOM
 
-    def run_skill_data(self, data: Sequence[int], wait: bool = True, timeout: Optional[float] = None) -> Reply:
+    def run_skill_data(self, data: Sequence[int], *, wait: bool = True, timeout: Optional[float] = None) -> Reply:
         """Upload a skill array in the Instinct*.h layout and run it; waits until a behavior ends."""
         try:
             values = [operator.index(v) for v in data]
@@ -134,38 +134,38 @@ class Robot:
             raise RobotTimeout("robot did not confirm the uploaded skill in time; check power and the connection")
         return reply
 
-    def sit(self, wait: bool = True) -> Reply:
+    def sit(self, *, wait: bool = True) -> Reply:
         """Sit down."""
         return self._cmd("k", Skill.SIT, wait=wait)
 
-    def stand(self, wait: bool = True) -> Reply:
+    def stand(self, *, wait: bool = True) -> Reply:
         """Stand up."""
         return self._cmd("k", Skill.STAND, wait=wait)
 
-    def stop(self, wait: bool = True) -> Reply:
+    def stop(self, *, wait: bool = True) -> Reply:
         """Stop walking and stand still."""
         return self._cmd("k", Skill.STAND, wait=wait)
 
-    def rest(self, wait: bool = True) -> Reply:
+    def rest(self, *, wait: bool = True) -> Reply:
         """Lie down and turn the servos off."""
         return self._cmd("d", wait=wait)
 
     # --- gaits (keep going until stop()) ---------------------------------
     # They echo when they start (src/reaction.h:1555-1565), so they keep the short timeout.
 
-    def walk(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+    def walk(self, direction: Direction = "forward", *, wait: bool = True) -> Reply:
         """Start walking forward, left or right until stop()."""
         return self._cmd("k", "wk" + _direction(direction), wait=wait)
 
-    def trot(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+    def trot(self, direction: Direction = "forward", *, wait: bool = True) -> Reply:
         """Start trotting forward, left or right until stop()."""
         return self._cmd("k", "tr" + _direction(direction), wait=wait)
 
-    def crawl(self, direction: Direction = "forward", wait: bool = True) -> Reply:
+    def crawl(self, direction: Direction = "forward", *, wait: bool = True) -> Reply:
         """Start crawling forward, left or right until stop()."""
         return self._cmd("k", "cr" + _direction(direction), wait=wait)
 
-    def back(self, direction: Optional[Literal["left", "right"]] = None, wait: bool = True) -> Reply:
+    def back(self, direction: Optional[Literal["left", "right"]] = None, *, wait: bool = True) -> Reply:
         """Start walking backward, straight or turning left or right, until stop()."""
         if direction not in (None, "left", "right"):
             raise ValueError(f"direction must be left, right or None, got {direction!r}")
@@ -173,11 +173,11 @@ class Robot:
 
     # --- joints -----------------------------------------------------------
 
-    def joint(self, index: Union[Joint, int], angle: float, wait: bool = True) -> Reply:
+    def joint(self, index: Union[Joint, int], angle: float, *, wait: bool = True) -> Reply:
         """Move one joint to an angle in degrees (rounded to a whole degree)."""
         return self._cmd("i", index, _degrees(angle), wait=wait)
 
-    def move_joints(self, angles: Dict[Union[Joint, int], float], sequential: bool = False, wait: bool = True) -> Reply:
+    def move_joints(self, angles: Dict[Union[Joint, int], float], *, sequential: bool = False, wait: bool = True) -> Reply:
         """Move several joints together, or one after another if sequential."""
         flat = [v for index, angle in angles.items() for v in (index, _degrees(angle))]
         return self._cmd("m" if sequential else "i", *flat, wait=wait)
@@ -197,7 +197,7 @@ class Robot:
         On S3 firmware (Quaddle) it returns as the note starts."""
         return self._cmd("b", note, duration)
 
-    def melody(self, notes: Sequence[Tuple[int, int]], wait: bool = True) -> Reply:
+    def melody(self, notes: Sequence[Tuple[int, int]], *, wait: bool = True) -> Reply:
         """Play (note, duration) pairs as in beep(); waits until the tune ends."""
         if not notes:
             raise ValueError("melody needs at least one note; a bare 'b' toggles all sound")  # src/reaction.h:967
@@ -251,7 +251,7 @@ class Robot:
 
     # --- Wi-Fi ------------------------------------------------------------
 
-    def setup_wifi(self, ssid: str, password: str, timeout: float = 60.0) -> str:
+    def setup_wifi(self, ssid: str, password: str, *, timeout: float = 60.0) -> str:
         """Over USB, put the robot on a 2.4 GHz Wi-Fi network and return its IP address for petoi.connect().
 
         OpenCatEsp32 reboots to start its Wi-Fi server; OpenCatEsp32S3 starts it without rebooting."""
