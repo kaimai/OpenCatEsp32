@@ -75,6 +75,11 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   avoids it by discovering only the UART service (connect in 0.9 s). Whether the two are related is not known.
   Fix in firmware: attach the HID service only in mouse mode. Until then: disconnect the robot in the macOS Bluetooth
   panel (or restart it) before each connect. Part I (abandoned-connect cleanup in `BleTransport`) is fixed.
+  **Fixed in OpenCatEsp32S3 main (06502f4, 2026-11-07; the robot still reports `Q_261103`).** With it flashed, the
+  robot logs `[BLE] client disconnected` when we let go and `advertising restarted` 1.9 s later, macOS no longer
+  subscribes as a mouse, and `ble_compare.py` through `petoi` got 10 of 10 by scan (8.8 s avg, 5 s of it the scan)
+  and 10 of 10 by address (3.7 s avg). `petoi.connect("ble")` on older S3 builds still hits the takeover. The HID
+  service is still attached at `petoiBleUartNimble.h:473`, so why this fixes it is not known.
 - [ ] **Firmware: larger serial receive buffer.** `Serial.setRxBufferSize()` before `Serial.begin()` in OpenCatEsp32 and
   OpenCatEsp32S3 would stop long commands losing bytes for every client, not only `petoi` (Part H). The buffer size on
   current builds wasn't checked.
