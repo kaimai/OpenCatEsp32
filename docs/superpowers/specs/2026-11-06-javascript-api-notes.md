@@ -9,11 +9,12 @@ Working notes for the JavaScript port of the `petoi` Python package. Not a desig
 - The remaining Python TODOs (`python/TODO.md`) go to the team.
 - **Delivery (2026-11-07):** one ready-built file, loaded with `<script src="petoi.js">`, which adds a global `Petoi`; the same build also ships as an ES module (`petoi.mjs`). The built files are committed. Whether to also publish to npm is left open; PetoiWebCoding doesn't need it.
 - **Folder (2026-11-07):** `javascript/`, next to `python/`.
+- **Source language (2026-11-07):** TypeScript, built into `petoi.js`, `petoi.mjs` and a types file. Node and the build are for developers only.
+- **Names (2026-11-07):** JavaScript style (`runSkillData`), with the same methods and behavior as Python (from the design research below; owner didn't object).
 
 ## Recommended, not yet confirmed
 
 - **Browser-only first version** (Web Serial, Web Bluetooth, WebSocket). PetoiWebCoding's robot code is all browser code; Node there is only dev tooling. Node support can be added later behind its own transports if someone needs it.
-- **TypeScript source**, shipped as JavaScript with type definitions.
 - **Scope:** the API itself is one design, plan and build. Moving PetoiWebCoding onto it is a separate project afterwards: different repository and maintainers (Rongzhong Li, Jason.W), and it needs its own browser testing.
 
 ## What exists
@@ -57,7 +58,7 @@ This repo also has `PetoiWebCodingBlocks/`, an older copy of the same app (`main
    - **B. ES module only** (`<script type="module">`). Cleaner for modern code, but each PetoiWebCoding page would need changing to use it.
    - **C. An npm package** installed into their committed `node_modules/`. Most standard, but needs publishing to npm, and they would still load a built file.
 2. Folder name next to `python/`. *Answered 2026-11-07: `javascript/`.*
-3. How closely names follow Python (`run_skill_data` vs `runSkillData`, async everywhere).
+3. How closely names follow Python (`run_skill_data` vs `runSkillData`, async everywhere). *Answered 2026-11-07: JavaScript style, same behavior.*
 4. How to test without a browser (fake Web Serial / Web Bluetooth / WebSocket objects, shared test vectors from the Python tests).
 5. Whether converting one PetoiWebCoding page is part of this project as a proof, or all of it is left to its maintainers.
 
