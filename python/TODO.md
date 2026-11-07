@@ -16,7 +16,9 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   `PETOI_ON_STAND=1 pytest tests/hardware -v -s -k "uploaded or largest"` on USB, BLE and Wi-Fi, robot on a stand.
   On Quaddle USB (2026-11-05, Part H) a 124-frame upload in one write lost bytes 1 in 3 times, and so did 20-byte slices
   1 ms apart (the Desktop App tester's pacing); `SerialTransport` now sends the first 64 bytes of a long `K`/`b`/`B` command (the only ones the firmware waits 200 ms for), waits 50 ms, then the
-  rest, which passed 20 of 20. Still to check: the same on Bittle X (2487 bytes), and over Bluetooth Classic.
+  rest, which passed 20 of 20. 2026-11-06, Quaddle on a stand, newest S3 main: the 3 upload tests passed on USB and on
+  BLE, and the largest (124 frames, 1247 bytes) passed 10 more times on each. Still to check: Bittle X (2487 bytes),
+  Bluetooth Classic and Wi-Fi.
   Also find out whether CUB gaits are 8 or 12 wide (both are accepted unless the model is Bittle or Nybble).
 - [ ] **Wi-Fi setup (`setup_wifi`)** (plan part A):
   `PETOI_PORT=/dev/cu.usbserial-XXXX PETOI_WIFI_SSID=... PETOI_WIFI_PASSWORD=... .venv/bin/python -m pytest tests/hardware/test_wifi_setup.py -v -s`.
