@@ -33,9 +33,10 @@ Plans for most items: `docs/superpowers/plans/2026-10-27-python-api-followups.md
   smoke tests 18 passed, 3 failed, all fixed in Part H (melody confirmed early, long upload lost bytes, and a stop test
   that failed only after the bad upload). Skill times: `sit` 0.4 s, `up` 0.1, `balance` 0.4, `str` 0.4, `hi` 3.3,
   `pee` 2.4, `scrh` 1.8, `hsk` 1.7, `hds` 3.2, `kc` 1.0, `nd` 1.3, `wh` 1.3, `dropRec` 0.4. A single `b` with three
-  notes plays all three (heard), but echoes after 0.07 s. Still open: rerun on USB after Part H with
-  `PETOI_ON_STAND=1`; BLE and Wi-Fi; the `?` retry on a sleeping robot, the BLE handshake, `z0` keeping it still,
-  leg order, Scout's head pan at index 0 (`PETOI_SCOUT=1`), and `setup_wifi()` without a reboot. The USB link dropped
+  notes plays all three (heard), but echoes after 0.07 s. Done 2026-11-06 (below): USB and BLE
+  suites, uploads on a stand, the BLE handshake, and on USB the interactive leg order, `z0` keeping it still for 10 s,
+  and three notes heard (all answered yes by the owner). Still open: Wi-Fi, the `?` retry on a sleeping robot,
+  Scout's head pan at index 0 (`PETOI_SCOUT=1`), and `setup_wifi()` without a reboot. The USB link dropped
   out several times that day before it stayed up; a cable or hub problem is likely but unconfirmed.
   2026-11-06, newest S3 main (06502f4, reports `Q_261103`), floor runs with the watcher, uploads skipped: USB 27 passed;
   BLE 26 passed (the USB-only gyro line test skips). Skill times on both within 0.1 s of each other and within 0.6 s of
